@@ -38,8 +38,8 @@
 
 typedef struct
 {
-	s32 width;
-	s32 height;
+	int width;
+	int height;
 #if defined(_WIN32) || defined(_WIN64)
 	HWND window_handle;
 	WINDOWPLACEMENT window_placement;
@@ -1573,570 +1573,1124 @@ if(!(X)) printf(#X "\n")
 
 #define GL_CALL __stdcall
 
+#elif defined(__linux__)
+#define LOAD_GL_PROC(X) \
+hogl_##X = (X##_proctype*)glXGetProcAddress((const GLubyte*)#X); \
+if(!(hogl_##X)) hogl_##X = X 
+
+#define GL_CALL
+#endif
+
 #define INSTANTIATE_GLCALL(R, X, A) \
-typedef R GL_CALL X##_proctype##A;	\
-X##_proctype* X = 0
+typedef R GL_CALL X##_proctype A;	\
+X##_proctype* hogl_##X = 0
 
 INSTANTIATE_GLCALL(void, glClearBufferiv, (GLenum buffer, GLint drawbuffer, const GLint* value));
+#define glClearBufferiv hogl_glClearBufferiv
 INSTANTIATE_GLCALL(void, glClearBufferuiv, (GLenum buffer, GLint drawbuffer, const GLuint* value));
+#define glClearBufferuiv hogl_glClearBufferuiv
 INSTANTIATE_GLCALL(void, glClearBufferfv, (GLenum buffer, GLint drawbuffer, const GLfloat* value));
+#define glClearBufferfv hogl_glClearBufferfv,
 INSTANTIATE_GLCALL(void, glClearBufferfi, (GLenum buffer, GLint drawbuffer, GLfloat depth, GLint stencil));
+#define glClearBufferfi hogl_glClearBufferfi
 INSTANTIATE_GLCALL(void, glClearNamedFramebufferiv, (GLuint framebuffer, GLenum buffer, GLint drawbuffer, const GLint* value));
+#define glClearNamedFramebufferiv hogl_glClearNamedFramebufferiv
 INSTANTIATE_GLCALL(void, glClearNamedFramebufferuiv, (GLuint framebuffer, GLuint buffer, GLint drawbuffer, const GLuint* value));
+#define glClearNamedFramebufferuiv hogl_glClearNamedFramebufferuiv
 INSTANTIATE_GLCALL(void, glClearNamedFramebufferfv, (GLuint framebuffer, GLuint buffer, GLint drawbuffer, const GLfloat* value));
+#define glClearNamedFramebufferfv hogl_glClearNamedFramebufferfv
 INSTANTIATE_GLCALL(void, glClearNamedFramebufferfi, (GLuint framebuffer, GLuint buffer, GLint drawbuffer, const GLfloat depth, GLint stencil));
+#define glClearNamedFramebufferfi hogl_glClearNamedFramebufferfi
 INSTANTIATE_GLCALL(void, glNamedFramebufferReadBuffer, (GLuint framebuffer, GLenum mode));
+#define glNamedFramebufferReadBuffer hogl_glNamedFramebufferReadBuffer
 INSTANTIATE_GLCALL(void, glReadnPixels, (GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLsizei bufSize, void* data));
+#define glReadnPixels hogl_glReadnPixels
 
 INSTANTIATE_GLCALL(void, glActiveTexture, (GLenum texture));
+#define glActiveTexture hogl_glActiveTexture
 INSTANTIATE_GLCALL(void, glBindImageTexture, (GLuint unit, GLuint texture, GLint level, GLboolean layered, GLint layer, GLenum access, GLenum format));
+#define glBindImageTexture hogl_glBindImageTexture
 INSTANTIATE_GLCALL(void, glBindImageTextures, (GLuint first, GLsizei count, const GLuint *textures));
+#define glBindImageTextures hogl_glBindImageTextures
 INSTANTIATE_GLCALL(void, glBindTextureUnit, (GLuint unit, GLuint texture));
+#define glBindTextureUnit hogl_glBindTextureUnit
 INSTANTIATE_GLCALL(void, glBindTextures, (GLuint first, GLsizei count, const GLuint* textures));
+#define glBindTextures hogl_glBindTextures
 INSTANTIATE_GLCALL(void, glClearTexImage, (GLuint texture, GLint level, GLenum format, GLenum type, const void* data));
+#define glClearTexImage hogl_glClearTexImage
 INSTANTIATE_GLCALL(void, glClearTexSubImage, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void* data));
+#define glClearTexSubImage hogl_glClearTexSubImage
 INSTANTIATE_GLCALL(void, glCompressedTexImage1D, (GLenum target, GLint level, GLenum internalformat, GLsizei width, GLint border, GLsizei imageSize, const GLvoid* data));
+#define glCompressedTexImage1D hogl_glCompressedTexImage1D
 INSTANTIATE_GLCALL(void, glCompressedTexImage2D, (GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const GLvoid* data));
+#define glCompressedTexImage2D hogl_glCompressedTexImage2D
 INSTANTIATE_GLCALL(void, glCompressedTexImage3D, (GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLsizei imageSize, const GLvoid* data));
+#define glCompressedTexImage3D hogl_glCompressedTexImage3D
 INSTANTIATE_GLCALL(void, glCompressedTexSubImage1D, (GLenum target, GLint level, GLint xoffset, GLsizei width, GLenum format, GLsizei imageSize, const GLvoid* data));
+#define glCompressedTexSubImage1D hogl_glCompressedTexSubImage1D
 INSTANTIATE_GLCALL(void, glCompressedTextureSubImage1D, (GLuint texture, GLint level, GLint xoffset, GLsizei width, GLenum format, GLsizei imageSize, const void* data));
+#define glCompressedTextureSubImage1D hogl_glCompressedTextureSubImage1D
 INSTANTIATE_GLCALL(void, glCompressedTexSubImage2D, (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const GLvoid* data));
+#define glCompressedTexSubImage2D hogl_glCompressedTexSubImage2D
 INSTANTIATE_GLCALL(void, glCompressedTextureSubImage2D, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void* data));
+#define glCompressedTextureSubImage2D hogl_glCompressedTextureSubImage2D
 INSTANTIATE_GLCALL(void, glCompressedTexSubImage3D, (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLsizei imageSize, const GLvoid* data));
+#define glCompressedTexSubImage3D hogl_glCompressedTexSubImage3D
 INSTANTIATE_GLCALL(void, glCompressedTextureSubImage3D, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLsizei imageSize, const void* data));
+#define glCompressedTextureSubImage3D hogl_glCompressedTextureSubImage3D
 INSTANTIATE_GLCALL(void, glCopyTextureSubImage1D, (GLuint texture, GLint level, GLint xoffset, GLint x, GLint y, GLsizei width));
+#define glCopyTextureSubImage1D hogl_glCopyTextureSubImage1D
 INSTANTIATE_GLCALL(void, glCopyTextureSubImage2D, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height));
+#define glCopyTextureSubImage2D hogl_glCopyTextureSubImage2D
 INSTANTIATE_GLCALL(void, glCopyImageSubData, (GLuint srcName, GLenum srcTarget, GLint srcLevel, GLint srcX, GLint srcY, GLint srcZ, GLuint dstName, GLenum dstTarget, GLint dstLevel, GLint dstX, GLint dstY, GLint dstZ, GLsizei srcWidth, GLsizei srcHeight, GLsizei srcDepth));
+#define glCopyImageSubData hogl_glCopyImageSubData
 INSTANTIATE_GLCALL(void, glCopyTexSubImage3D, (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLint x, GLint y, GLsizei width, GLsizei height));
+#define glCopyTexSubImage3D hogl_glCopyTexSubImage3D
 INSTANTIATE_GLCALL(void, glCopyTextureSubImage3D, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLint x, GLint y, GLsizei width, GLsizei height));
+#define glCopyTextureSubImage3D hogl_glCopyTextureSubImage3D
 INSTANTIATE_GLCALL(void, glCreateTextures, (GLenum target, GLsizei n, GLuint *textures));
+#define glCreateTextures hogl_glCreateTextures
 INSTANTIATE_GLCALL(void, glGetCompressedTexImage, (GLenum target, GLint level, GLvoid * pixels));
+#define glGetCompressedTexImage hogl_glGetCompressedTexImage
 INSTANTIATE_GLCALL(void, glGetnCompressedTexImage, (GLenum target, GLint level, GLsizei bufSize, void* pixels));
+#define glGetnCompressedTexImage hogl_glGetnCompressedTexImage
 INSTANTIATE_GLCALL(void, glGetCompressedTextureImage, (GLuint texture, GLint level, GLsizei bufSize, void* pixels));
+#define glGetCompressedTextureImage hogl_glGetCompressedTextureImage
 INSTANTIATE_GLCALL(void, glGetCompressedTextureSubImage, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLsizei bufSize, void* pixels));
+#define glGetCompressedTextureSubImage hogl_glGetCompressedTextureSubImage
 INSTANTIATE_GLCALL(void, glGetnTexImage, (GLenum target, GLint level, GLenum format, GLenum type, GLsizei bufSize, void* pixels));
+#define glGetnTexImage hogl_glGetnTexImage
 INSTANTIATE_GLCALL(void, glGetTextureImage, (GLuint texture, GLint level, GLenum format, GLenum type, GLsizei bufSize, void* pixels));
+#define glGetTextureImage hogl_glGetTextureImage
 INSTANTIATE_GLCALL(void, glGetTextureLevelParameterfv, (GLuint texture, GLint level, GLenum pname, GLfloat* params));
+#define glGetTextureLevelParameterfv hogl_glGetTextureLevelParameterfv
 INSTANTIATE_GLCALL(void, glGetTextureLevelParameteriv, (GLuint texture, GLint level, GLenum pname, GLint* params));
+#define glGetTextureLevelParameteriv hogl_glGetTextureLevelParameteriv
 INSTANTIATE_GLCALL(void, glGetTexParameterIiv, (GLenum target, GLenum pname, GLint* params));
+#define glGetTexParameterIiv hogl_glGetTexParameterIiv
 INSTANTIATE_GLCALL(void, glGetTexParameterIuiv, (GLenum target, GLenum pname, GLuint* params));
+#define glGetTexParameterIuiv hogl_glGetTexParameterIuiv
 INSTANTIATE_GLCALL(void, glGetTextureParameterfv, (GLuint texture, GLenum pname, GLfloat* params));
+#define glGetTextureParameterfv hogl_glGetTextureParameterfv
 INSTANTIATE_GLCALL(void, glGetTextureParameteriv, (GLuint texture, GLenum pname, GLint* params));
+#define glGetTextureParameteriv hogl_glGetTextureParameteriv
 INSTANTIATE_GLCALL(void, glGetTextureParameterIiv, (GLuint texture, GLenum pname, GLint* params));
+#define glGetTextureParameterIiv hogl_glGetTextureParameterIiv
 INSTANTIATE_GLCALL(void, glGetTextureParameterIuiv, (GLuint texture, GLenum pname, GLuint* params));
+#define glGetTextureParameterIuiv hogl_glGetTextureParameterIuiv
 INSTANTIATE_GLCALL(void, glGetTextureSubImage, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, GLsizei bufSize, void* pixels));
+#define glGetTextureSubImage hogl_glGetTextureSubImage
 INSTANTIATE_GLCALL(void, glInvalidateTexImage, (GLuint texture, GLint level));
+#define glInvalidateTexImage hogl_glInvalidateTexImage
 INSTANTIATE_GLCALL(void, glInvalidateTexSubImage, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth));
+#define glInvalidateTexSubImage hogl_glInvalidateTexSubImage
 INSTANTIATE_GLCALL(void, glTexBuffer, (GLenum target, GLenum internalFormat, GLuint buffer));
+#define glTexBuffer hogl_glTexBuffer
 INSTANTIATE_GLCALL(void, glTextureBuffer, (GLuint texture, GLenum internalformat, GLuint buffer));
+#define glTextureBuffer hogl_glTextureBuffer
 INSTANTIATE_GLCALL(void, glTexBufferRange, (GLenum target, GLenum internalFormat, GLuint buffer, GLintptr offset, GLsizeiptr size));
+#define glTexBufferRange hogl_glTexBufferRange
 INSTANTIATE_GLCALL(void, glTextureBufferRange, (GLenum target, GLenum internalFormat, GLuint buffer, GLintptr offset, GLsizei size));
+#define glTextureBufferRange hogl_glTextureBufferRange
 INSTANTIATE_GLCALL(void, glTexImage2DMultisample, (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations));
+#define glTexImage2DMultisample hogl_glTexImage2DMultisample
 INSTANTIATE_GLCALL(void, glTexImage3D, (GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const GLvoid* data));
+#define glTexImage3D hogl_glTexImage3D
 INSTANTIATE_GLCALL(void, glTexImage3DMultisample, (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations));
+#define glTexImage3DMultisample hogl_glTexImage3DMultisample
 INSTANTIATE_GLCALL(void, glTextureParameterf, (GLenum target, GLenum pname, GLfloat param));
+#define glTextureParameterf hogl_glTextureParameterf
 INSTANTIATE_GLCALL(void, glTextureParameteri, (GLenum target, GLenum pname, GLint param));
+#define glTextureParameteri hogl_glTextureParameteri
 INSTANTIATE_GLCALL(void, glTexParameterIiv, (GLenum target, GLenum pname, const GLint* params));
+#define glTexParameterIiv hogl_glTexParameterIiv
 INSTANTIATE_GLCALL(void, glTexParameterIuiv, (GLenum target, GLenum pname, const GLuint* params));
+#define glTexParameterIuiv hogl_glTexParameterIuiv
 INSTANTIATE_GLCALL(void, glTextureParameterfv, (GLuint texture, GLenum pname, const GLfloat* paramtexture));
+#define glTextureParameterfv hogl_glTextureParameterfv
 INSTANTIATE_GLCALL(void, glTextureParameteriv, (GLuint texture, GLenum pname, const GLint* param));
+#define glTextureParameteriv hogl_glTextureParameteriv
 INSTANTIATE_GLCALL(void, glTextureParameterIiv, (GLuint texture, GLenum pname, const GLint* params));
+#define glTextureParameterIiv hogl_glTextureParameterIiv
 INSTANTIATE_GLCALL(void, glTextureParameterIuiv, (GLuint texture, GLenum pname, const GLuint* params));
+#define glTextureParameterIuiv hogl_glTextureParameterIuiv
 INSTANTIATE_GLCALL(void, glTexStorage1D, (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width));
+#define glTexStorage1D hogl_glTexStorage1D
 INSTANTIATE_GLCALL(void, glTextureStorage1D, (GLuint texture, GLsizei levels, GLenum internalformat, GLsizei width));
+#define glTextureStorage1D hogl_glTextureStorage1D
 INSTANTIATE_GLCALL(void, glTexStorage2D, (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height));
+#define glTexStorage2D hogl_glTexStorage2D
 INSTANTIATE_GLCALL(void, glTextureStorage2D, (GLuint texture, GLsizei levels, GLenum internalformat, GLsizei width,GLsizei height));
+#define glTextureStorage2D hogl_glTextureStorage2D
 INSTANTIATE_GLCALL(void, glTexStorage2DMultisample, (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations));
+#define glTexStorage2DMultisample hogl_glTexStorage2DMultisample
 INSTANTIATE_GLCALL(void, glTextureStorage2DMultisample, (GLuint texture, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations));
+#define glTextureStorage2DMultisample hogl_glTextureStorage2DMultisample
 INSTANTIATE_GLCALL(void, glTexStorage3D, (GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth));
+#define glTexStorage3D hogl_glTexStorage3D
 INSTANTIATE_GLCALL(void, glTextureStorage3D, (GLuint texture, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth));
+#define glTextureStorage3D hogl_glTextureStorage3D
 INSTANTIATE_GLCALL(void, glTexStorage3DMultisample, (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations));
+#define glTexStorage3DMultisample hogl_glTexStorage3DMultisample
 INSTANTIATE_GLCALL(void, glTextureStorage3DMultisample, (GLuint texture, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations));
+#define glTextureStorage3DMultisample hogl_glTextureStorage3DMultisample
 INSTANTIATE_GLCALL(void, glTextureSubImage1D, (GLuint texture, GLint level, GLint xoffset, GLsizei width, GLenum format, GLenum type, const void* pixels));
+#define glTextureSubImage1D hogl_glTextureSubImage1D
 INSTANTIATE_GLCALL(void, glTextureSubImage2D, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void* pixels));
+#define glTextureSubImage2D hogl_glTextureSubImage2D
 INSTANTIATE_GLCALL(void, glTexSubImage3D, (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid* pixels));
+#define glTexSubImage3D hogl_glTexSubImage3D
 INSTANTIATE_GLCALL(void, glTextureSubImage3D, (GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void* pixels));
+#define glTextureSubImage3D hogl_glTextureSubImage3D
 INSTANTIATE_GLCALL(void, glTextureView, (GLuint texture, GLenum target, GLuint origtexture, GLenum internalformat, GLuint minlevel, GLuint numlevels, GLuint minlayer, GLuint numlayers));
+#define glTextureView hogl_glTextureView
 
 INSTANTIATE_GLCALL(void, glBindFramebuffer, (GLenum target, GLuint framebuffer));
+#define glBindFramebuffer hogl_glBindFramebuffer
 INSTANTIATE_GLCALL(void, glBindRenderbuffer, (GLenum target, GLuint renderbuffer));
+#define glBindRenderbuffer hogl_glBindRenderbuffer
 INSTANTIATE_GLCALL(void, glBlitFramebuffer, (GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter));
+#define glBlitFramebuffer hogl_glBlitFramebuffer
 INSTANTIATE_GLCALL(void, glBlitNamedFramebuffer, (GLuint readFramebuffer, GLuint drawFramebuffer, GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter));
+#define glBlitNamedFramebuffer hogl_glBlitNamedFramebuffer
 INSTANTIATE_GLCALL(GLenum, glCheckFramebufferStatus, (GLenum target));
+#define glCheckFramebufferStatus hogl_glCheckFramebufferStatus
 INSTANTIATE_GLCALL(GLenum, glCheckNamedFramebufferStatus, (GLuint framebuffer, GLenum target));
+#define glCheckNamedFramebufferStatus hogl_glCheckNamedFramebufferStatus
 INSTANTIATE_GLCALL(void, glCreateFramebuffers, (GLsizei n, GLuint* ids));
+#define glCreateFramebuffers hogl_glCreateFramebuffers
 INSTANTIATE_GLCALL(void, glCreateRenderbuffers, (GLsizei n, GLuint* renderbuffers));
+#define glCreateRenderbuffers hogl_glCreateRenderbuffers
 INSTANTIATE_GLCALL(void, glDeleteFramebuffers, (GLsizei n, GLuint* framebuffers));
+#define glDeleteFramebuffers hogl_glDeleteFramebuffers
 INSTANTIATE_GLCALL(void, glDeleteRenderbuffers, (GLsizei n, GLuint* renderbuffers));
+#define glDeleteRenderbuffers hogl_glDeleteRenderbuffers
 INSTANTIATE_GLCALL(void, glDrawBuffers, (GLsizei n, const GLenum* bufs));
+#define glDrawBuffers hogl_glDrawBuffers
 INSTANTIATE_GLCALL(void, glNamedFramebufferDrawBuffers, (GLuint framebuffer, GLsizei n, const GLenum* bufs));
+#define glNamedFramebufferDrawBuffers hogl_glNamedFramebufferDrawBuffers
 INSTANTIATE_GLCALL(void, glFramebufferParameteri, (GLenum target, GLenum pname, GLint param));
+#define glFramebufferParameteri hogl_glFramebufferParameteri
 INSTANTIATE_GLCALL(void, glNamedFramebufferParameteri, (GLuint framebuffer, GLenum pname, GLint param));
+#define glNamedFramebufferParameteri hogl_glNamedFramebufferParameteri
 INSTANTIATE_GLCALL(void, glFramebufferRenderbuffer, (GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer));
+#define glFramebufferRenderbuffer hogl_glFramebufferRenderbuffer
 INSTANTIATE_GLCALL(void, glNamedFramebufferRenderbuffer, (GLuint framebuffer, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer));
+#define glNamedFramebufferRenderbuffer hogl_glNamedFramebufferRenderbuffer
 INSTANTIATE_GLCALL(void, glFramebufferTexture, (GLenum target, GLenum attachment, GLuint texture, GLint level));
+#define glFramebufferTexture hogl_glFramebufferTexture
 INSTANTIATE_GLCALL(void, glFramebufferTexture1D, (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level));
+#define glFramebufferTexture1D hogl_glFramebufferTexture1D
 INSTANTIATE_GLCALL(void, glFramebufferTexture2D, (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level));
+#define glFramebufferTexture2D hogl_glFramebufferTexture2D
 INSTANTIATE_GLCALL(void, glFramebufferTexture3D, (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint layer));
+#define glFramebufferTexture3D hogl_glFramebufferTexture3D
 INSTANTIATE_GLCALL(void, glNamedFramebufferTexture, (GLuint framebuffer, GLenum attachment, GLuint texture, GLint level));
+#define glNamedFramebufferTexture hogl_glNamedFramebufferTexture
 INSTANTIATE_GLCALL(void, glFramebufferTextureLayer, (GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer));
+#define glFramebufferTextureLayer hogl_glFramebufferTextureLayer
 INSTANTIATE_GLCALL(void, glNamedFramebufferTextureLayer, (GLuint framebuffer, GLenum attachment, GLuint texture, GLint level, GLint layer));
+#define glNamedFramebufferTextureLayer hogl_glNamedFramebufferTextureLayer
 INSTANTIATE_GLCALL(void, glGenFramebuffers, (GLsizei n, GLuint* ids));
+#define glGenFramebuffers hogl_glGenFramebuffers
 INSTANTIATE_GLCALL(void, glGenRenderbuffers, (GLsizei n, GLuint* renderbuffers));
+#define glGenRenderbuffers hogl_glGenRenderbuffers
 INSTANTIATE_GLCALL(void, glGenerateMipmap, (GLenum target));
+#define glGenerateMipmap hogl_glGenerateMipmap
 INSTANTIATE_GLCALL(void, glGenerateTextureMipmap, (GLuint texture));
+#define glGenerateTextureMipmap hogl_glGenerateTextureMipmap
 INSTANTIATE_GLCALL(void, glGetFramebufferAttachmentParameteriv, (GLenum target, GLenum attachment, GLenum pname, GLint* params));
+#define glGetFramebufferAttachmentParameteriv hogl_glGetFramebufferAttachmentParameteriv
 INSTANTIATE_GLCALL(void, glGetNamedFramebufferAttachmentParameteriv, (GLuint framebuffer, GLenum attachment, GLenum pname, GLint* params));
+#define glGetNamedFramebufferAttachmentParameteriv hogl_glGetNamedFramebufferAttachmentParameteriv
 INSTANTIATE_GLCALL(void, glGetFramebufferParameteriv, (GLenum target, GLenum pname, GLint* params));
+#define glGetFramebufferParameteriv hogl_glGetFramebufferParameteriv
 INSTANTIATE_GLCALL(void, glGetNamedFramebufferParameteriv, (GLuint framebuffer, GLenum pname, GLint* param));
+#define glGetNamedFramebufferParameteriv hogl_glGetNamedFramebufferParameteriv
 INSTANTIATE_GLCALL(void, glGetRenderbufferParameteriv, (GLenum target, GLenum pname, GLint* params));
+#define glGetRenderbufferParameteriv hogl_glGetRenderbufferParameteriv
 INSTANTIATE_GLCALL(void, glGetNamedRenderbufferParameteriv, (GLuint renderbuffer, GLenum pname, GLint* params));
+#define glGetNamedRenderbufferParameteriv hogl_glGetNamedRenderbufferParameteriv
 INSTANTIATE_GLCALL(void, glInvalidateFramebuffer, (GLenum target, GLsizei numAttachments, const GLenum* attachments));
+#define glInvalidateFramebuffer hogl_glInvalidateFramebuffer
 INSTANTIATE_GLCALL(void, glInvalidateNamedFramebufferData, (GLuint framebuffer, GLsizei numAttachments, const GLenum* attachments));
+#define glInvalidateNamedFramebufferData hogl_glInvalidateNamedFramebufferData
 INSTANTIATE_GLCALL(void, glInvalidateSubFramebuffer, (GLenum target, GLsizei numAttachments, const GLenum* attachments, GLint x, GLint y, GLint width, GLint height));
+#define glInvalidateSubFramebuffer hogl_glInvalidateSubFramebuffer
 INSTANTIATE_GLCALL(void, glInvalidateNamedFramebufferSubData, (GLuint framebuffer, GLsizei numAttachments, const GLenum* attachments, GLint x, GLint y, GLsizei width, GLsizei height));
+#define glInvalidateNamedFramebufferSubData hogl_glInvalidateNamedFramebufferSubData
 INSTANTIATE_GLCALL(GLboolean, glIsFramebuffer, (GLuint framebuffer));
+#define glIsFramebuffer hogl_glIsFramebuffer
 INSTANTIATE_GLCALL(GLboolean, glIsRenderbuffer, (GLuint renderbuffer));
+#define glIsRenderbuffer hogl_glIsRenderbuffer
 INSTANTIATE_GLCALL(void, glRenderbufferStorage, (GLenum target, GLenum internalformat, GLsizei width, GLsizei height));
+#define glRenderbufferStorage hogl_glRenderbufferStorage
 INSTANTIATE_GLCALL(void, glNamedRenderbufferStorage, (GLuint renderbuffer, GLenum internalformat, GLsizei width, GLsizei height));
+#define glNamedRenderbufferStorage hogl_glNamedRenderbufferStorage
 INSTANTIATE_GLCALL(void, glRenderbufferStorageMultisample, (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height));
+#define glRenderbufferStorageMultisample hogl_glRenderbufferStorageMultisample
 INSTANTIATE_GLCALL(void, glNamedRenderbufferStorageMultisample, (GLuint renderbuffer, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height));
+#define glNamedRenderbufferStorageMultisample hogl_glNamedRenderbufferStorageMultisample
 INSTANTIATE_GLCALL(void, glSampleMaski, (GLuint maskNumber, GLbitfield mask));
+#define glSampleMaski hogl_glSampleMaski
 
 INSTANTIATE_GLCALL(void, glAttachShader, (GLuint program, GLuint shader));
+#define glAttachShader hogl_glAttachShader
 INSTANTIATE_GLCALL(void, glBindAttribLocation, (GLuint program, GLuint index, const GLchar* name));
+#define glBindAttribLocation hogl_glBindAttribLocation
 INSTANTIATE_GLCALL(void, glBindFragDataLocation, (GLuint program, GLuint colorNumber, const char* name));
+#define glBindFragDataLocation hogl_glBindFragDataLocation
 INSTANTIATE_GLCALL(void, glBindFragDataLocationIndexed, (GLuint program, GLuint colorNumber, GLuint index, const char* name));
+#define glBindFragDataLocationIndexed hogl_glBindFragDataLocationIndexed
 INSTANTIATE_GLCALL(void, glCompileShader, (GLuint shader));
+#define glCompileShader hogl_glCompileShader
 INSTANTIATE_GLCALL(GLuint, glCreateProgram, ());
+#define glCreateProgram hogl_glCreateProgram
 INSTANTIATE_GLCALL(GLuint, glCreateShader, (GLenum shaderType));
+#define glCreateShader hogl_glCreateShader
 INSTANTIATE_GLCALL(GLuint, glCreateShaderProgramv, (GLenum type, GLsizei count, const char** strings));
+#define glCreateShaderProgramv hogl_glCreateShaderProgramv
 INSTANTIATE_GLCALL(void, glDeleteProgram, (GLuint program));
+#define glDeleteProgram hogl_glDeleteProgram
 INSTANTIATE_GLCALL(void, glDeleteShader, (GLuint shader));
+#define glDeleteShader hogl_glDeleteShader
 INSTANTIATE_GLCALL(void, glDetachShader, (GLuint program, GLuint shader));
+#define glDetachShader hogl_glDetachShader
 INSTANTIATE_GLCALL(void, glGetActiveAtomicCounterBufferiv, (GLuint program, GLuint bufferIndex, GLenum pname, GLint* params));
+#define glGetActiveAtomicCounterBufferiv hogl_glGetActiveAtomicCounterBufferiv
 INSTANTIATE_GLCALL(void, glGetActiveAttrib, (GLuint program, GLuint index, GLsizei bufSize, GLsizei* length, GLint* size, GLenum* type, GLchar* name));
+#define glGetActiveAttrib hogl_glGetActiveAttrib
 INSTANTIATE_GLCALL(void, glGetActiveSubroutineName, (GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei* length, GLchar* name));
+#define glGetActiveSubroutineName hogl_glGetActiveSubroutineName
 INSTANTIATE_GLCALL(void, glGetActiveSubroutineUniformiv, (GLuint program, GLenum shadertype, GLuint index, GLenum pname, GLint* values));
+#define glGetActiveSubroutineUniformiv hogl_glGetActiveSubroutineUniformiv
 INSTANTIATE_GLCALL(void, glGetActiveSubroutineUniformName, (GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei* length, GLchar* name));
+#define glGetActiveSubroutineUniformName hogl_glGetActiveSubroutineUniformName
 INSTANTIATE_GLCALL(void, glGetActiveUniform, (GLuint program, GLuint index, GLsizei bufSize, GLsizei* length, GLint* size, GLenum* type, GLchar* name));
+#define glGetActiveUniform hogl_glGetActiveUniform
 INSTANTIATE_GLCALL(void, glGetActiveUniformBlockiv, (GLuint program, GLuint uniformBlockIndex, GLenum pname, GLint* params));
+#define glGetActiveUniformBlockiv hogl_glGetActiveUniformBlockiv
 INSTANTIATE_GLCALL(void, glGetActiveUniformBlockName, (GLuint program, GLuint uniformBlockIndex, GLsizei bufSize, GLsizei* length, GLchar* uniformBlockName));
+#define glGetActiveUniformBlockName hogl_glGetActiveUniformBlockName
 INSTANTIATE_GLCALL(void, glGetActiveUniformName, (GLuint program, GLuint uniformIndex, GLsizei bufSize, GLsizei* length, GLchar* uniformName));
+#define glGetActiveUniformName hogl_glGetActiveUniformName
 INSTANTIATE_GLCALL(void, glGetActiveUniformsiv, (GLuint program, GLsizei uniformCount, const GLuint* uniformIndices, GLenum pname, GLint* params));
+#define glGetActiveUniformsiv hogl_glGetActiveUniformsiv
 INSTANTIATE_GLCALL(void, glGetAttachedShaders, (GLuint program, GLsizei maxCount, GLsizei* count, GLuint* shaders));
+#define glGetAttachedShaders hogl_glGetAttachedShaders
 INSTANTIATE_GLCALL(GLint, glGetAttribLocation, (GLuint program, const GLchar* name));
+#define glGetAttribLocation hogl_glGetAttribLocation
 INSTANTIATE_GLCALL(GLint, glGetFragDataIndex, (GLuint program, const char* name));
+#define glGetFragDataIndex hogl_glGetFragDataIndex
 INSTANTIATE_GLCALL(GLint, glGetFragDataLocation, (GLuint program, const char* name));
+#define glGetFragDataLocation hogl_glGetFragDataLocation
 INSTANTIATE_GLCALL(void, glGetProgramiv, (GLuint program, GLenum pname, GLint* params));
+#define glGetProgramiv hogl_glGetProgramiv
 INSTANTIATE_GLCALL(void, glGetProgramBinary, (GLuint program, GLsizei bufsize, GLsizei* length, GLenum* binaryFormat, void* binary));
+#define glGetProgramBinary hogl_glGetProgramBinary
 INSTANTIATE_GLCALL(void, glGetProgramInfoLog, (GLuint program, GLsizei maxLength, GLsizei* length, GLchar* infoLog));
+#define glGetProgramInfoLog hogl_glGetProgramInfoLog
 INSTANTIATE_GLCALL(void, glGetProgramResourceiv, (GLuint program, GLenum programInterface, GLuint index, GLsizei propCount, const GLenum* props, GLsizei bufSize, GLsizei* length, GLint* params));
+#define glGetProgramResourceiv hogl_glGetProgramResourceiv
 INSTANTIATE_GLCALL(GLuint, glGetProgramResourceIndex, (GLuint program, GLenum programInterface, const char* name));
+#define glGetProgramResourceIndex hogl_glGetProgramResourceIndex
 INSTANTIATE_GLCALL(GLint, glGetProgramResourceLocation, (GLuint program, GLenum programInterface, const char* name));
+#define glGetProgramResourceLocation hogl_glGetProgramResourceLocation
 INSTANTIATE_GLCALL(GLint, glGetProgramResourceLocationIndex, (GLuint program, GLenum programInterface, const char* name));
+#define glGetProgramResourceLocationIndex hogl_glGetProgramResourceLocationIndex
 INSTANTIATE_GLCALL(void, glGetProgramResourceName, (GLuint program, GLenum programInterface, GLuint index, GLsizei bufSize, GLsizei* length, char* name));
+#define glGetProgramResourceName hogl_glGetProgramResourceName
 INSTANTIATE_GLCALL(void, glGetProgramStageiv, (GLuint program, GLenum shadertype, GLenum pname, GLint* values));
+#define glGetProgramStageiv hogl_glGetProgramStageiv
 INSTANTIATE_GLCALL(void, glGetShaderiv, (GLuint shader, GLenum pname, GLint* params));
+#define glGetShaderiv hogl_glGetShaderiv
 INSTANTIATE_GLCALL(void, glGetShaderInfoLog, (GLuint shader, GLsizei maxLength, GLsizei* length, GLchar* infoLog));
+#define glGetShaderInfoLog hogl_glGetShaderInfoLog
 INSTANTIATE_GLCALL(void, glGetShaderPrecisionFormat, (GLenum shaderType, GLenum precisionType, GLint* range, GLint* precision));
+#define glGetShaderPrecisionFormat hogl_glGetShaderPrecisionFormat
 INSTANTIATE_GLCALL(void, glGetShaderSource, (GLuint shader, GLsizei bufSize, GLsizei* length, GLchar* source));
+#define glGetShaderSource hogl_glGetShaderSource
 INSTANTIATE_GLCALL(GLuint, glGetSubroutineIndex, (GLuint program, GLenum shadertype, const GLchar* name));
+#define glGetSubroutineIndex hogl_glGetSubroutineIndex
 INSTANTIATE_GLCALL(GLint, glGetSubroutineUniformLocation, (GLuint program, GLenum shadertype, const GLchar* name));
+#define glGetSubroutineUniformLocation hogl_glGetSubroutineUniformLocation
 INSTANTIATE_GLCALL(void, glGetUniformfv, (GLuint program, GLint location, GLfloat* params));
+#define glGetUniformfv hogl_glGetUniformfv
 INSTANTIATE_GLCALL(void, glGetUniformiv, (GLuint program, GLint location, GLint* params));
+#define glGetUniformiv hogl_glGetUniformiv
 INSTANTIATE_GLCALL(void, glGetUniformuiv, (GLuint program, GLint location, GLuint* params));
+#define glGetUniformuiv hogl_glGetUniformuiv
 INSTANTIATE_GLCALL(void, glGetUniformdv, (GLuint program, GLint location, GLdouble* params));
+#define glGetUniformdv hogl_glGetUniformdv
 INSTANTIATE_GLCALL(void, glGetnUniformfv, (GLuint program, GLint location, GLsizei bufSize, GLfloat* params));
+#define glGetnUniformfv hogl_glGetnUniformfv
 INSTANTIATE_GLCALL(void, glGetnUniformiv, (GLuint program, GLint location, GLsizei bufSize, GLint* params));
+#define glGetnUniformiv hogl_glGetnUniformiv
 INSTANTIATE_GLCALL(void, glGetnUniformuiv, (GLuint program, GLint location, GLsizei bufSize, GLuint* params));
+#define glGetnUniformuiv hogl_glGetnUniformuiv
 INSTANTIATE_GLCALL(void, glGetnUniformdv, (GLuint program, GLint location, GLsizei bufSize, GLdouble *params));
+#define glGetnUniformdv hogl_glGetnUniformdv
 INSTANTIATE_GLCALL(GLuint, glGetUniformBlockIndex, (GLuint program, const GLchar* uniformBlockName));
+#define glGetUniformBlockIndex hogl_glGetUniformBlockIndex
 INSTANTIATE_GLCALL(void, glGetUniformIndices, (GLuint program, GLsizei uniformCount, const GLchar** uniformNames, GLuint* uniformIndices));
+#define glGetUniformIndices hogl_glGetUniformIndices
 INSTANTIATE_GLCALL(GLint, glGetUniformLocation, (GLuint program, const GLchar* name));
+#define glGetUniformLocation hogl_glGetUniformLocation
 INSTANTIATE_GLCALL(void, glGetUniformSubroutineuiv, (GLenum shadertype, GLint location, GLuint* values));
+#define glGetUniformSubroutineuiv hogl_glGetUniformSubroutineuiv
 INSTANTIATE_GLCALL(GLboolean, glIsProgram, (GLuint program));
+#define glIsProgram hogl_glIsProgram
 INSTANTIATE_GLCALL(GLboolean, glIsShader, (GLuint shader));
+#define glIsShader hogl_glIsShader
 INSTANTIATE_GLCALL(void, glLinkProgram, (GLuint program));
+#define glLinkProgram hogl_glLinkProgram
 INSTANTIATE_GLCALL(void, glMinSampleShading, (GLfloat value));
+#define glMinSampleShading hogl_glMinSampleShading
 INSTANTIATE_GLCALL(void, glProgramBinary, (GLuint program, GLenum binaryFormat, const void* binary, GLsizei length));
+#define glProgramBinary hogl_glProgramBinary
 INSTANTIATE_GLCALL(void, glProgramParameteri, (GLuint program, GLenum pname, GLint value));
+#define glProgramParameteri hogl_glProgramParameteri
 INSTANTIATE_GLCALL(void, glProgramUniform1f, (GLuint program, GLint location, GLfloat v0));
+#define glProgramUniform1f hogl_glProgramUniform1f
 INSTANTIATE_GLCALL(void, glProgramUniform2f, (GLuint program, GLint location, GLfloat v0, GLfloat v1));
+#define glProgramUniform2f hogl_glProgramUniform2f
 INSTANTIATE_GLCALL(void, glProgramUniform3f, (GLuint program, GLint location, GLfloat v0, GLfloat v1, GLfloat v2));
+#define glProgramUniform3f hogl_glProgramUniform3f
 INSTANTIATE_GLCALL(void, glProgramUniform4f, (GLuint program, GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3));
+#define glProgramUniform4f hogl_glProgramUniform4f
 INSTANTIATE_GLCALL(void, glProgramUniform1i, (GLuint program, GLint location, GLint v0));
+#define glProgramUniform1i hogl_glProgramUniform1i
 INSTANTIATE_GLCALL(void, glProgramUniform2i, (GLuint program, GLint location, GLint v0, GLint v1));
+#define glProgramUniform2i hogl_glProgramUniform2i
 INSTANTIATE_GLCALL(void, glProgramUniform3i, (GLuint program, GLint location, GLint v0, GLint v1, GLint v2));
+#define glProgramUniform3i hogl_glProgramUniform3i
 INSTANTIATE_GLCALL(void, glProgramUniform4i, (GLuint program, GLint location, GLint v0, GLint v1, GLint v2, GLint v3));
+#define glProgramUniform4i hogl_glProgramUniform4i
 INSTANTIATE_GLCALL(void, glProgramUniform1ui, (GLuint program, GLint location, GLuint v0));
+#define glProgramUniform1ui hogl_glProgramUniform1ui
 INSTANTIATE_GLCALL(void, glProgramUniform2ui, (GLuint program, GLint location, GLint v0, GLuint v1));
+#define glProgramUniform2ui hogl_glProgramUniform2ui
 INSTANTIATE_GLCALL(void, glProgramUniform3ui, (GLuint program, GLint location, GLint v0, GLint v1, GLuint v2));
+#define glProgramUniform3ui hogl_glProgramUniform3ui
 INSTANTIATE_GLCALL(void, glProgramUniform4ui, (GLuint program, GLint location, GLint v0, GLint v1, GLint v2, GLuint v3));
+#define glProgramUniform4ui hogl_glProgramUniform4ui
 INSTANTIATE_GLCALL(void, glProgramUniform1fv, (GLuint program, GLint location, GLsizei count, const GLfloat* value));
+#define glProgramUniform1fv hogl_glProgramUniform1fv
 INSTANTIATE_GLCALL(void, glProgramUniform2fv, (GLuint program, GLint location, GLsizei count, const GLfloat* value));
+#define glProgramUniform2fv hogl_glProgramUniform2fv
 INSTANTIATE_GLCALL(void, glProgramUniform3fv, (GLuint program, GLint location, GLsizei count, const GLfloat* value));
+#define glProgramUniform3fv hogl_glProgramUniform3fv
 INSTANTIATE_GLCALL(void, glProgramUniform4fv, (GLuint program, GLint location, GLsizei count, const GLfloat* value));
+#define glProgramUniform4fv hogl_glProgramUniform4fv
 INSTANTIATE_GLCALL(void, glProgramUniform1iv, (GLuint program, GLint location, GLsizei count, const GLint* value));
+#define glProgramUniform1iv hogl_glProgramUniform1iv
 INSTANTIATE_GLCALL(void, glProgramUniform2iv, (GLuint program, GLint location, GLsizei count, const GLint* value));
+#define glProgramUniform2iv hogl_glProgramUniform2iv
 INSTANTIATE_GLCALL(void, glProgramUniform3iv, (GLuint program, GLint location, GLsizei count, const GLint* value));
+#define glProgramUniform3iv hogl_glProgramUniform3iv
 INSTANTIATE_GLCALL(void, glProgramUniform4iv, (GLuint program, GLint location, GLsizei count, const GLint* value));
+#define glProgramUniform4iv hogl_glProgramUniform4iv
 INSTANTIATE_GLCALL(void, glProgramUniform1uiv, (GLuint program, GLint location, GLsizei count, const GLuint* value));
+#define glProgramUniform1uiv hogl_glProgramUniform1uiv
 INSTANTIATE_GLCALL(void, glProgramUniform2uiv, (GLuint program, GLint location, GLsizei count, const GLuint* value));
+#define glProgramUniform2uiv hogl_glProgramUniform2uiv
 INSTANTIATE_GLCALL(void, glProgramUniform3uiv, (GLuint program, GLint location, GLsizei count, const GLuint* value));
+#define glProgramUniform3uiv hogl_glProgramUniform3uiv
 INSTANTIATE_GLCALL(void, glProgramUniform4uiv, (GLuint program, GLint location, GLsizei count, const GLuint* value));
+#define glProgramUniform4uiv hogl_glProgramUniform4uiv
 INSTANTIATE_GLCALL(void, glProgramUniformMatrix2fv, (GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glProgramUniformMatrix2fv hogl_glProgramUniformMatrix2fv
 INSTANTIATE_GLCALL(void, glProgramUniformMatrix3fv, (GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glProgramUniformMatrix3fv hogl_glProgramUniformMatrix3fv
 INSTANTIATE_GLCALL(void, glProgramUniformMatrix4fv, (GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glProgramUniformMatrix4fv hogl_glProgramUniformMatrix4fv
 INSTANTIATE_GLCALL(void, glProgramUniformMatrix2x3fv, (GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glProgramUniformMatrix2x3fv hogl_glProgramUniformMatrix2x3fv
 INSTANTIATE_GLCALL(void, glProgramUniformMatrix3x2fv, (GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glProgramUniformMatrix3x2fv hogl_glProgramUniformMatrix3x2fv
 INSTANTIATE_GLCALL(void, glProgramUniformMatrix2x4fv, (GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glProgramUniformMatrix2x4fv hogl_glProgramUniformMatrix2x4fv
 INSTANTIATE_GLCALL(void, glProgramUniformMatrix4x2fv, (GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glProgramUniformMatrix4x2fv hogl_glProgramUniformMatrix4x2fv
 INSTANTIATE_GLCALL(void, glProgramUniformMatrix3x4fv, (GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glProgramUniformMatrix3x4fv hogl_glProgramUniformMatrix3x4fv
 INSTANTIATE_GLCALL(void, glProgramUniformMatrix4x3fv, (GLuint program, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glProgramUniformMatrix4x3fv hogl_glProgramUniformMatrix4x3fv
 INSTANTIATE_GLCALL(void, glReleaseShaderCompiler, ());
+#define glReleaseShaderCompiler hogl_glReleaseShaderCompiler
 INSTANTIATE_GLCALL(void, glShaderBinary, (GLsizei count, const GLuint* shaders, GLenum binaryFormat, const void* binary, GLsizei length));
+#define glShaderBinary hogl_glShaderBinary
 INSTANTIATE_GLCALL(void, glShaderSource, (GLuint shader, GLsizei count, const GLchar** string_in, const GLint* length));
+#define glShaderSource hogl_glShaderSource
 INSTANTIATE_GLCALL(void, glShaderStorageBlockBinding, (GLuint program, GLuint storageBlockIndex, GLuint storageBlockBinding));
+#define glShaderStorageBlockBinding hogl_glShaderStorageBlockBinding
 INSTANTIATE_GLCALL(void, glUniform1f, (GLint location, GLfloat v0));
+#define glUniform1f hogl_glUniform1f
 INSTANTIATE_GLCALL(void, glUniform2f, (GLint location, GLfloat v0, GLfloat v1));
+#define glUniform2f hogl_glUniform2f
 INSTANTIATE_GLCALL(void, glUniform3f, (GLint location, GLfloat v0, GLfloat v1, GLfloat v2));
+#define glUniform3f hogl_glUniform3f
 INSTANTIATE_GLCALL(void, glUniform4f, (GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3));
+#define glUniform4f hogl_glUniform4f
 INSTANTIATE_GLCALL(void, glUniform1i, (GLint location, GLint v0));
+#define glUniform1i hogl_glUniform1i
 INSTANTIATE_GLCALL(void, glUniform2i, (GLint location, GLint v0, GLint v1));
+#define glUniform2i hogl_glUniform2i
 INSTANTIATE_GLCALL(void, glUniform3i, (GLint location, GLint v0, GLint v1, GLint v2));
+#define glUniform3i hogl_glUniform3i
 INSTANTIATE_GLCALL(void, glUniform4i, (GLint location, GLint v0, GLint v1, GLint v2, GLint v3));
+#define glUniform4i hogl_glUniform4i
 INSTANTIATE_GLCALL(void, glUniform1ui, (GLint location, GLuint v0));
+#define glUniform1ui hogl_glUniform1ui
 INSTANTIATE_GLCALL(void, glUniform2ui, (GLint location, GLuint v0, GLuint v1));
+#define glUniform2ui hogl_glUniform2ui
 INSTANTIATE_GLCALL(void, glUniform3ui, (GLint location, GLuint v0, GLuint v1, GLuint v2));
+#define glUniform3ui hogl_glUniform3ui
 INSTANTIATE_GLCALL(void, glUniform4ui, (GLint location, GLuint v0, GLuint v1, GLuint v2, GLuint v3));
+#define glUniform4ui hogl_glUniform4ui
 INSTANTIATE_GLCALL(void, glUniform1fv, (GLint location, GLsizei count, const GLfloat* value));
+#define glUniform1fv hogl_glUniform1fv
 INSTANTIATE_GLCALL(void, glUniform2fv, (GLint location, GLsizei count, const GLfloat* value));
+#define glUniform2fv hogl_glUniform2fv
 INSTANTIATE_GLCALL(void, glUniform3fv, (GLint location, GLsizei count, const GLfloat* value));
+#define glUniform3fv hogl_glUniform3fv
 INSTANTIATE_GLCALL(void, glUniform4fv, (GLint location, GLsizei count, const GLfloat* value));
+#define glUniform4fv hogl_glUniform4fv
 INSTANTIATE_GLCALL(void, glUniform1iv, (GLint location, GLsizei count, const GLint* value));
+#define glUniform1iv hogl_glUniform1iv
 INSTANTIATE_GLCALL(void, glUniform2iv, (GLint location, GLsizei count, const GLint* value));
+#define glUniform2iv hogl_glUniform2iv
 INSTANTIATE_GLCALL(void, glUniform3iv, (GLint location, GLsizei count, const GLint* value));
+#define glUniform3iv hogl_glUniform3iv
 INSTANTIATE_GLCALL(void, glUniform4iv, (GLint location, GLsizei count, const GLint* value));
+#define glUniform4iv hogl_glUniform4iv
 INSTANTIATE_GLCALL(void, glUniform1uiv, (GLint location, GLsizei count, const GLuint* value));
+#define glUniform1uiv hogl_glUniform1uiv
 INSTANTIATE_GLCALL(void, glUniform2uiv, (GLint location, GLsizei count, const GLuint* value));
+#define glUniform2uiv hogl_glUniform2uiv
 INSTANTIATE_GLCALL(void, glUniform3uiv, (GLint location, GLsizei count, const GLuint* value));
+#define glUniform3uiv hogl_glUniform3uiv
 INSTANTIATE_GLCALL(void, glUniform4uiv, (GLint location, GLsizei count, const GLuint* value));
+#define glUniform4uiv hogl_glUniform4uiv
 INSTANTIATE_GLCALL(void, glUniformMatrix2fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glUniformMatrix2fv hogl_glUniformMatrix2fv
 INSTANTIATE_GLCALL(void, glUniformMatrix3fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glUniformMatrix3fv hogl_glUniformMatrix3fv
 INSTANTIATE_GLCALL(void, glUniformMatrix4fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glUniformMatrix4fv hogl_glUniformMatrix4fv
 INSTANTIATE_GLCALL(void, glUniformMatrix2x3fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glUniformMatrix2x3fv hogl_glUniformMatrix2x3fv
 INSTANTIATE_GLCALL(void, glUniformMatrix3x2fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glUniformMatrix3x2fv hogl_glUniformMatrix3x2fv
 INSTANTIATE_GLCALL(void, glUniformMatrix2x4fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glUniformMatrix2x4fv hogl_glUniformMatrix2x4fv
 INSTANTIATE_GLCALL(void, glUniformMatrix4x2fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glUniformMatrix4x2fv hogl_glUniformMatrix4x2fv
 INSTANTIATE_GLCALL(void, glUniformMatrix3x4fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glUniformMatrix3x4fv hogl_glUniformMatrix3x4fv
 INSTANTIATE_GLCALL(void, glUniformMatrix4x3fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat* value));
+#define glUniformMatrix4x3fv hogl_glUniformMatrix4x3fv
 INSTANTIATE_GLCALL(void, glUniformBlockBinding, (GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding));
+#define glUniformBlockBinding hogl_glUniformBlockBinding
 INSTANTIATE_GLCALL(void, glUniformSubroutinesuiv, (GLenum shadertype, GLsizei count, const GLuint* indices));
+#define glUniformSubroutinesuiv hogl_glUniformSubroutinesuiv
 INSTANTIATE_GLCALL(void, glUseProgram, (GLuint program));
+#define glUseProgram hogl_glUseProgram
 INSTANTIATE_GLCALL(void, glUseProgramStages, (GLuint pipeline, GLbitfield stages, GLuint program));
+#define glUseProgramStages hogl_glUseProgramStages
 INSTANTIATE_GLCALL(void, glValidateProgram, (GLuint program));
+#define glValidateProgram hogl_glValidateProgram
 
 INSTANTIATE_GLCALL(void, glBlendColor, (GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha));
+#define glBlendColor hogl_glBlendColor
 INSTANTIATE_GLCALL(void, glBlendEquation, (GLenum mode));
+#define glBlendEquation hogl_glBlendEquation
 INSTANTIATE_GLCALL(void, glBlendEquationi, (GLuint buf, GLenum mode));
+#define glBlendEquationi hogl_glBlendEquationi
 INSTANTIATE_GLCALL(void, glBlendEquationSeparate, (GLenum modeRGB, GLenum modeAlpha));
+#define glBlendEquationSeparate hogl_glBlendEquationSeparate
 INSTANTIATE_GLCALL(void, glBlendEquationSeparatei, (GLuint buf, GLenum modeRGB, GLenum modeAlpha));
+#define glBlendEquationSeparatei hogl_glBlendEquationSeparatei
 INSTANTIATE_GLCALL(void, glBlendFunci, (GLuint buf, GLenum sfactor, GLenum dfactor));
+#define glBlendFunci hogl_glBlendFunci
 INSTANTIATE_GLCALL(void, glBlendFuncSeparate, (GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha));
+#define glBlendFuncSeparate hogl_glBlendFuncSeparate
 INSTANTIATE_GLCALL(void, glBlendFuncSeparatei, (GLuint buf, GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha));
+#define glBlendFuncSeparatei hogl_glBlendFuncSeparatei
 INSTANTIATE_GLCALL(void, glClampColor, (GLenum target, GLenum clamp));
+#define glClampColor hogl_glClampColor
 INSTANTIATE_GLCALL(void, glClipControl, (GLenum origin, GLenum depth));
+#define glClipControl hogl_glClipControl
 INSTANTIATE_GLCALL(void, glColorMaski, (GLuint buf, GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha));
+#define glColorMaski hogl_glColorMaski
 INSTANTIATE_GLCALL(void, glDepthRangef, (GLfloat nearVal, GLfloat farVal));
+#define glDepthRangef hogl_glDepthRangef
 INSTANTIATE_GLCALL(void, glDepthRangeArrayv, (GLuint first, GLsizei count, const GLdouble* v));
+#define glDepthRangeArrayv hogl_glDepthRangeArrayv
 INSTANTIATE_GLCALL(void, glDepthRangeIndexed, (GLuint index, GLdouble nearVal, GLdouble farVa));
+#define glDepthRangeIndexed hogl_glDepthRangeIndexed
 INSTANTIATE_GLCALL(void, glEnablei, (GLenum cap, GLuint index));
+#define glEnablei hogl_glEnablei
 INSTANTIATE_GLCALL(void, glDisablei, (GLenum cap, GLuint index));
+#define glDisablei hogl_glDisablei
 INSTANTIATE_GLCALL(void, glGetInteger64v, (GLenum pname, GLint64* data));
+#define glGetInteger64v hogl_glGetInteger64v
 INSTANTIATE_GLCALL(void, glGetBooleani_v, (GLenum target, GLuint index, GLboolean* data));
+#define glGetBooleani_v hogl_glGetBooleani_v
 INSTANTIATE_GLCALL(void, glGetFloati_v, (GLenum target, GLuint index, GLfloat* data));
+#define glGetFloati_v hogl_glGetFloati_v
 INSTANTIATE_GLCALL(void, glGetDoublei_v, (GLenum target, GLuint index, GLdouble* data));
+#define glGetDoublei_v hogl_glGetDoublei_v
 INSTANTIATE_GLCALL(void, glGetInteger64i_v, (GLenum target, GLuint index, GLint64* data));
+#define glGetInteger64i_v hogl_glGetInteger64i_v
 INSTANTIATE_GLCALL(void, glIsEnabledi, (GLenum cap, GLuint index));
+#define glIsEnabledi hogl_glIsEnabledi
 INSTANTIATE_GLCALL(void, glPointParameterf, (GLenum pname, GLfloat param));
+#define glPointParameterf hogl_glPointParameterf
 INSTANTIATE_GLCALL(void, glPointParameteri, (GLenum pname, GLint param));
+#define glPointParameteri hogl_glPointParameteri
 INSTANTIATE_GLCALL(void, glPointParameterfv, (GLenum pname, const GLfloat* params));
+#define glPointParameterfv hogl_glPointParameterfv
 INSTANTIATE_GLCALL(void, glPointParameteriv, (GLenum pname, const GLint* params));
+#define glPointParameteriv hogl_glPointParameteriv
 INSTANTIATE_GLCALL(void, glSampleCoverage, (GLfloat value, GLboolean invert));
+#define glSampleCoverage hogl_glSampleCoverage
 INSTANTIATE_GLCALL(void, glScissorArrayv, (GLuint first, GLsizei count, const GLint* v));
+#define glScissorArrayv hogl_glScissorArrayv
 INSTANTIATE_GLCALL(void, glScissorIndexed, (GLuint index, GLint left, GLint bottom, GLsizei width, GLsizei height));
+#define glScissorIndexed hogl_glScissorIndexed
 INSTANTIATE_GLCALL(void, glScissorIndexedv, (GLuint index, const GLint* v));
+#define glScissorIndexedv hogl_glScissorIndexedv
 INSTANTIATE_GLCALL(void, glStencilFuncSeparate, (GLenum face, GLenum func, GLint ref, GLuint mask));
+#define glStencilFuncSeparate hogl_glStencilFuncSeparate
 INSTANTIATE_GLCALL(void, glStencilMaskSeparate, (GLenum face, GLuint mask));
+#define glStencilMaskSeparate hogl_glStencilMaskSeparate
 INSTANTIATE_GLCALL(void, glStencilOpSeparate, (GLenum face, GLenum sfail, GLenum dpfail, GLenum dppass));
+#define glStencilOpSeparate hogl_glStencilOpSeparate
 INSTANTIATE_GLCALL(void, glViewportArrayv, (GLuint first, GLsizei count, const GLfloat* v));
+#define glViewportArrayv hogl_glViewportArrayv
 INSTANTIATE_GLCALL(void, glViewportIndexedf, (GLuint index, GLfloat x, GLfloat y, GLfloat w, GLfloat h));
+#define glViewportIndexedf hogl_glViewportIndexedf
 INSTANTIATE_GLCALL(void, glViewportIndexedfv, (GLuint index, const GLfloat* v));
+#define glViewportIndexedfv hogl_glViewportIndexedfv
 
 INSTANTIATE_GLCALL(void, glBeginTransformFeedback, (GLenum primitiveMode));
+#define glBeginTransformFeedback hogl_glBeginTransformFeedback
 INSTANTIATE_GLCALL(void, glBindTransformFeedback, (GLenum target, GLuint id));
+#define glBindTransformFeedback hogl_glBindTransformFeedback
 INSTANTIATE_GLCALL(void, glCreateTransformFeedbacks, (GLsizei n, GLuint* ids));
+#define glCreateTransformFeedbacks hogl_glCreateTransformFeedbacks
 INSTANTIATE_GLCALL(void, glDeleteTransformFeedbacks, (GLsizei n, const GLuint* ids));
+#define glDeleteTransformFeedbacks hogl_glDeleteTransformFeedbacks
 INSTANTIATE_GLCALL(void, glDrawTransformFeedback, (GLenum mode, GLuint id));
+#define glDrawTransformFeedback hogl_glDrawTransformFeedback
 INSTANTIATE_GLCALL(void, glDrawTransformFeedbackInstanced, (GLenum mode, GLuint id, GLsizei primcount));
+#define glDrawTransformFeedbackInstanced hogl_glDrawTransformFeedbackInstanced
 INSTANTIATE_GLCALL(void, glDrawTransformFeedbackStream, (GLenum mode, GLuint id, GLuint stream));
+#define glDrawTransformFeedbackStream hogl_glDrawTransformFeedbackStream
 INSTANTIATE_GLCALL(void, glDrawTransformFeedbackStreamInstanced, (GLenum mode, GLuint id, GLuint stream, GLsizei primcount));
+#define glDrawTransformFeedbackStreamInstanced hogl_glDrawTransformFeedbackStreamInstanced
 INSTANTIATE_GLCALL(void, glEndTransformFeedback, ());
+#define glEndTransformFeedback hogl_glEndTransformFeedback
 INSTANTIATE_GLCALL(void, glGenTransformFeedbacks, (GLsizei n, GLuint* ids));
+#define glGenTransformFeedbacks hogl_glGenTransformFeedbacks
 INSTANTIATE_GLCALL(void, glGetTransformFeedbackiv, (GLuint xfb, GLenum pname, GLint* param));
+#define glGetTransformFeedbackiv hogl_glGetTransformFeedbackiv
 INSTANTIATE_GLCALL(void, glGetTransformFeedbacki_v, (GLuint xfb, GLenum pname, GLuint index, GLint* param));
+#define glGetTransformFeedbacki_v hogl_glGetTransformFeedbacki_v
 INSTANTIATE_GLCALL(void, glGetTransformFeedbacki64_v, (GLuint xfb, GLenum pname, GLuint index, GLint64* param));
+#define glGetTransformFeedbacki64_v hogl_glGetTransformFeedbacki64_v
 INSTANTIATE_GLCALL(void, glGetTransformFeedbackVarying, (GLuint program, GLuint index, GLsizei bufSize, GLsizei* length, GLsizei* size, GLenum* type, char* name));
+#define glGetTransformFeedbackVarying hogl_glGetTransformFeedbackVarying
 INSTANTIATE_GLCALL(GLboolean, glIsTransformFeedback, (GLuint id));
+#define glIsTransformFeedback hogl_glIsTransformFeedback
 INSTANTIATE_GLCALL(void, glPauseTransformFeedback, ());
+#define glPauseTransformFeedback hogl_glPauseTransformFeedback
 INSTANTIATE_GLCALL(void, glResumeTransformFeedback, ());
+#define glResumeTransformFeedback hogl_glResumeTransformFeedback
 INSTANTIATE_GLCALL(void, glTransformFeedbackBufferBase, (GLuint xfb, GLuint index, GLuint buffer));
+#define glTransformFeedbackBufferBase hogl_glTransformFeedbackBufferBase
 INSTANTIATE_GLCALL(void, glTransformFeedbackBufferRange, (GLuint xfb, GLuint index, GLuint buffer, GLintptr offset, GLsizei size));
+#define glTransformFeedbackBufferRange hogl_glTransformFeedbackBufferRange
 INSTANTIATE_GLCALL(void, glTransformFeedbackVaryings, (GLuint program, GLsizei count, const char** varyings, GLenum bufferMode));
+#define glTransformFeedbackVaryings hogl_glTransformFeedbackVaryings
 
 INSTANTIATE_GLCALL(void, glDispatchCompute, (GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z));
+#define glDispatchCompute hogl_glDispatchCompute
 INSTANTIATE_GLCALL(void, glDispatchComputeIndirect, (GLintptr indirect));
+#define glDispatchComputeIndirect hogl_glDispatchComputeIndirect
 INSTANTIATE_GLCALL(GLenum, glGetGraphicsResetStatus, ());
+#define glGetGraphicsResetStatus hogl_glGetGraphicsResetStatus
 INSTANTIATE_GLCALL(void, glGetInternalformativ, (GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint* params));
+#define glGetInternalformativ hogl_glGetInternalformativ
 INSTANTIATE_GLCALL(void, glGetInternalformati64v, (GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint* params));
+#define glGetInternalformati64v hogl_glGetInternalformati64v
 INSTANTIATE_GLCALL(void, glGetMultisamplefv, (GLenum pname, GLuint index, GLfloat* val));
+#define glGetMultisamplefv hogl_glGetMultisamplefv
 INSTANTIATE_GLCALL(const GLubyte*, glGetStringi, (GLenum name, GLuint index));
+#define glGetStringi hogl_glGetStringi
 INSTANTIATE_GLCALL(void, glMemoryBarrier, (GLbitfield barriers));
+#define glMemoryBarrier hogl_glMemoryBarrier
 INSTANTIATE_GLCALL(void, glMemoryBarrierByRegion, (GLbitfield barriers));
+#define glMemoryBarrierByRegion hogl_glMemoryBarrierByRegion
 
 INSTANTIATE_GLCALL(void, glBeginConditionalRender, (GLuint id, GLenum mode));
+#define glBeginConditionalRender hogl_glBeginConditionalRender
 INSTANTIATE_GLCALL(void, glBeginQuery, (GLenum target, GLuint id));
+#define glBeginQuery hogl_glBeginQuery
 INSTANTIATE_GLCALL(void, glBeginQueryIndexed, (GLenum target, GLuint index, GLuint id));
+#define glBeginQueryIndexed hogl_glBeginQueryIndexed
 INSTANTIATE_GLCALL(void, glCreateQueries, (GLenum target, GLsizei n, GLuint* ids));
+#define glCreateQueries hogl_glCreateQueries
 INSTANTIATE_GLCALL(void, glDeleteQueries, (GLsizei n, const GLuint* ids));
+#define glDeleteQueries hogl_glDeleteQueries
 INSTANTIATE_GLCALL(void, glEndConditionalRender, ());
+#define glEndConditionalRender hogl_glEndConditionalRender
 INSTANTIATE_GLCALL(void, glEndQuery, (GLenum target));
+#define glEndQuery hogl_glEndQuery
 INSTANTIATE_GLCALL(void, glEndQueryIndexed, (GLenum target, GLuint index));
+#define glEndQueryIndexed hogl_glEndQueryIndexed
 INSTANTIATE_GLCALL(void, glGenQueries, (GLsizei n, GLuint* ids));
+#define glGenQueries hogl_glGenQueries
 INSTANTIATE_GLCALL(void, glGetQueryIndexediv, (GLenum target, GLuint index, GLenum pname, GLint* params));
+#define glGetQueryIndexediv hogl_glGetQueryIndexediv
 INSTANTIATE_GLCALL(void, glGetQueryObjectiv, (GLuint id, GLenum pname, GLint* params));
+#define glGetQueryObjectiv hogl_glGetQueryObjectiv
 INSTANTIATE_GLCALL(void, glGetQueryObjectuiv, (GLuint id, GLenum pname, GLuint* params));
+#define glGetQueryObjectuiv hogl_glGetQueryObjectuiv
 INSTANTIATE_GLCALL(void, glGetQueryObjecti64v, (GLuint id, GLenum pname, GLint64* params));
+#define glGetQueryObjecti64v hogl_glGetQueryObjecti64v
 INSTANTIATE_GLCALL(void, glGetQueryObjectui64v, (GLuint id, GLenum pname, GLuint64* params));
+#define glGetQueryObjectui64v hogl_glGetQueryObjectui64v
 INSTANTIATE_GLCALL(void, glGetQueryiv, (GLenum target, GLenum pname, GLint* params));
+#define glGetQueryiv hogl_glGetQueryiv
 INSTANTIATE_GLCALL(GLboolean, glIsQuery, (GLuint id));
+#define glIsQuery hogl_glIsQuery
 INSTANTIATE_GLCALL(void, glQueryCounter, (GLuint id, GLenum target));
+#define glQueryCounter hogl_glQueryCounter
 
 INSTANTIATE_GLCALL(GLenum, glClientWaitSync, (GLsync sync, GLbitfield flags, GLuint64 timeout));
+#define glClientWaitSync hogl_glClientWaitSync
 INSTANTIATE_GLCALL(void, glDeleteSync, (GLsync sync));
+#define glDeleteSync hogl_glDeleteSync
 INSTANTIATE_GLCALL(GLsync, glFenceSync, (GLenum condition, GLbitfield flags));
+#define glFenceSync hogl_glFenceSync
 INSTANTIATE_GLCALL(void, glGetSynciv, (GLsync sync, GLenum pname, GLsizei bufSize, GLsizei* length, GLint* values));
+#define glGetSynciv hogl_glGetSynciv
 INSTANTIATE_GLCALL(GLboolean, glIsSync, (GLsync sync));
+#define glIsSync hogl_glIsSync
 INSTANTIATE_GLCALL(void, glTextureBarrier, ());
+#define glTextureBarrier hogl_glTextureBarrier
 INSTANTIATE_GLCALL(void, glWaitSync, (GLsync sync, GLbitfield flags, GLuint64 timeout));
+#define glWaitSync hogl_glWaitSync
 
 INSTANTIATE_GLCALL(void, glBindVertexArray, (GLuint array));
+#define glBindVertexArray hogl_glBindVertexArray
 INSTANTIATE_GLCALL(void, glDeleteVertexArrays, (GLsizei n, const GLuint* arrays));
+#define glDeleteVertexArrays hogl_glDeleteVertexArrays
 INSTANTIATE_GLCALL(void, glGenVertexArrays, (GLsizei n, GLuint* arrays));
+#define glGenVertexArrays hogl_glGenVertexArrays
 INSTANTIATE_GLCALL(GLboolean, glIsVertexArray, (GLuint array));
+#define glIsVertexArray hogl_glIsVertexArray
 
 INSTANTIATE_GLCALL(void, glBindSampler, (GLuint unit, GLuint sampler));
+#define glBindSampler hogl_glBindSampler
 INSTANTIATE_GLCALL(void, glBindSamplers, (GLuint first, GLsizei count, const GLuint* samplers));
+#define glBindSamplers hogl_glBindSamplers
 INSTANTIATE_GLCALL(void, glCreateSamplers, (GLsizei n, GLuint* samplers));
+#define glCreateSamplers hogl_glCreateSamplers
 INSTANTIATE_GLCALL(void, glDeleteSamplers, (GLsizei n, const GLuint* samplers));
+#define glDeleteSamplers hogl_glDeleteSamplers
 INSTANTIATE_GLCALL(void, glGenSamplers, (GLsizei n, GLuint* samplers));
+#define glGenSamplers hogl_glGenSamplers
 INSTANTIATE_GLCALL(void, glGetSamplerParameterfv, (GLuint sampler, GLenum pname, GLfloat* params));
+#define glGetSamplerParameterfv hogl_glGetSamplerParameterfv
 INSTANTIATE_GLCALL(void, glGetSamplerParameteriv, (GLuint sampler, GLenum pname, GLint* params));
+#define glGetSamplerParameteriv hogl_glGetSamplerParameteriv
 INSTANTIATE_GLCALL(void, glGetSamplerParameterIiv, (GLuint sampler, GLenum pname, GLint* params));
+#define glGetSamplerParameterIiv hogl_glGetSamplerParameterIiv
 INSTANTIATE_GLCALL(void, glGetSamplerParameterIuiv, (GLuint sampler, GLenum pname, GLuint* params));
+#define glGetSamplerParameterIuiv hogl_glGetSamplerParameterIuiv
 INSTANTIATE_GLCALL(GLboolean, glIsSampler, (GLuint id));
+#define glIsSampler hogl_glIsSampler
 INSTANTIATE_GLCALL(void, glSamplerParameterf, (GLuint sampler, GLenum pname, GLfloat param));
+#define glSamplerParameterf hogl_glSamplerParameterf
 INSTANTIATE_GLCALL(void, glSamplerParameteri, (GLuint sampler, GLenum pname, GLint param));
+#define glSamplerParameteri hogl_glSamplerParameteri
 INSTANTIATE_GLCALL(void, glSamplerParameterfv, (GLuint sampler, GLenum pname, const GLfloat* params));
+#define glSamplerParameterfv hogl_glSamplerParameterfv
 INSTANTIATE_GLCALL(void, glSamplerParameteriv, (GLuint sampler, GLenum pname, const GLint* params));
+#define glSamplerParameteriv hogl_glSamplerParameteriv
 INSTANTIATE_GLCALL(void, glSamplerParameterIiv, (GLuint sampler, GLenum pname, const GLint* params));
+#define glSamplerParameterIiv hogl_glSamplerParameterIiv
 INSTANTIATE_GLCALL(void, glSamplerParameterIuiv, (GLuint sampler, GLenum pname, const GLuint* params));
+#define glSamplerParameterIuiv hogl_glSamplerParameterIuiv
 
 INSTANTIATE_GLCALL(void, glActiveShaderProgram, (GLuint pipeline, GLuint program));
+#define glActiveShaderProgram hogl_glActiveShaderProgram
 INSTANTIATE_GLCALL(void, glBindProgramPipeline, (GLuint pipeline));
+#define glBindProgramPipeline hogl_glBindProgramPipeline
 INSTANTIATE_GLCALL(void, glCreateProgramPipelines, (GLsizei n, GLuint* pipelines));
+#define glCreateProgramPipelines hogl_glCreateProgramPipelines
 INSTANTIATE_GLCALL(void, glDeleteProgramPipelines, (GLsizei n, const GLuint* pipelines));
+#define glDeleteProgramPipelines hogl_glDeleteProgramPipelines
 INSTANTIATE_GLCALL(void, glGenProgramPipelines, (GLsizei n,	GLuint* pipelines));
+#define glGenProgramPipelines hogl_glGenProgramPipelines
 INSTANTIATE_GLCALL(void, glGetProgramPipelineiv, (GLuint pipeline, GLenum pname, GLint* params));
+#define glGetProgramPipelineiv hogl_glGetProgramPipelineiv
 INSTANTIATE_GLCALL(void, glGetProgramPipelineInfoLog, (GLuint pipeline, GLsizei bufSize, GLsizei* length, GLchar* infoLog));
+#define glGetProgramPipelineInfoLog hogl_glGetProgramPipelineInfoLog
 INSTANTIATE_GLCALL(GLboolean, glIsProgramPipeline, (GLuint pipeline));
+#define glIsProgramPipeline hogl_glIsProgramPipeline
 INSTANTIATE_GLCALL(void, glValidateProgramPipeline, (GLuint pipeline));
+#define glValidateProgramPipeline hogl_glValidateProgramPipeline
 
 INSTANTIATE_GLCALL(void, glDebugMessageCallback, (GLDEBUGPROC callback, void* userParam));
+#define glDebugMessageCallback hogl_glDebugMessageCallback
 INSTANTIATE_GLCALL(void, glDebugMessageControl, (GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint* ids, GLboolean enabled));
+#define glDebugMessageControl hogl_glDebugMessageControl
 INSTANTIATE_GLCALL(void, glDebugMessageInsert, (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message));
+#define glDebugMessageInsert hogl_glDebugMessageInsert
 INSTANTIATE_GLCALL(GLuint, glGetDebugMessageLog, (GLuint count, GLsizei bufSize, GLenum* sources, GLenum* types, GLuint* ids, GLenum* severities, GLsizei* lengths, GLchar* messageLog));
+#define glGetDebugMessageLog hogl_glGetDebugMessageLog
 INSTANTIATE_GLCALL(void, glGetObjectLabel, (GLenum identifier, GLuint name, GLsizei bifSize, GLsizei* length, char* label));
+#define glGetObjectLabel hogl_glGetObjectLabel
 INSTANTIATE_GLCALL(void, glGetObjectPtrLabel, (void* ptr, GLsizei bifSize, GLsizei* length, char* label));
+#define glGetObjectPtrLabel hogl_glGetObjectPtrLabel
 //INSTANTIATE_GLCALL(void, glGetPointerv, (GLenum pname, GLvoid** params));
 INSTANTIATE_GLCALL(void, glGetProgramInterfaceiv, (GLuint program, GLenum programInterface, GLenum pname, GLint* params));
+#define glGetProgramInterfaceiv hogl_glGetProgramInterfaceiv
 INSTANTIATE_GLCALL(void, glObjectLabel, (GLenum identifier, GLuint name, GLsizei length, const char* label));
+#define glObjectLabel hogl_glObjectLabel
 INSTANTIATE_GLCALL(void, glObjectPtrLabel, (void* ptr, GLsizei length, const char* label));
+#define glObjectPtrLabel hogl_glObjectPtrLabel
 INSTANTIATE_GLCALL(void, glPopDebugGroup, ());
+#define glPopDebugGroup hogl_glPopDebugGroup
 INSTANTIATE_GLCALL(void, glPushDebugGroup, (GLenum source, GLuint id, GLsizei length, const char* message));
+#define glPushDebugGroup hogl_glPushDebugGroup
 
 INSTANTIATE_GLCALL(void, glBindBuffer, (GLenum target, GLuint buffer));
+#define glBindBuffer hogl_glBindBuffer
 INSTANTIATE_GLCALL(void, glBindBufferBase, (GLenum target, GLuint index, GLuint buffer));
+#define glBindBufferBase hogl_glBindBufferBase
 INSTANTIATE_GLCALL(void, glBindBufferRange, (GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size));
+#define glBindBufferRange hogl_glBindBufferRange
 INSTANTIATE_GLCALL(void, glBindBuffersBase, (GLenum target, GLuint first, GLsizei count, const GLuint* buffers));
+#define glBindBuffersBase hogl_glBindBuffersBase
 INSTANTIATE_GLCALL(void, glBindBuffersRange, (GLenum target, GLuint first, GLsizei count, const GLuint* buffers, const GLintptr* offsets, const GLintptr* sizes));
+#define glBindBuffersRange hogl_glBindBuffersRange
 INSTANTIATE_GLCALL(void, glBindVertexBuffer, (GLuint bindingindex, GLuint buffer, GLintptr offset, GLintptr stride));
+#define glBindVertexBuffer hogl_glBindVertexBuffer
 INSTANTIATE_GLCALL(void, glVertexArrayVertexBuffer, (GLuint vaobj, GLuint bindingindex, GLuint buffer, GLintptr offset, GLsizei stride));
+#define glVertexArrayVertexBuffer hogl_glVertexArrayVertexBuffer
 INSTANTIATE_GLCALL(void, glBindVertexBuffers, (GLuint first, GLsizei count, const GLuint* buffers, const GLintptr* offsets, const GLsizei* strides));
+#define glBindVertexBuffers hogl_glBindVertexBuffers
 INSTANTIATE_GLCALL(void, glVertexArrayVertexBuffers, (GLuint vaobj, GLuint first, GLsizei count, const GLuint* buffers, const GLintptr* offsets, const GLsizei* strides));
+#define glVertexArrayVertexBuffers hogl_glVertexArrayVertexBuffers
 INSTANTIATE_GLCALL(void, glBufferData, (GLenum target, GLsizeiptr size, const GLvoid* data, GLenum usage));
+#define glBufferData hogl_glBufferData
 INSTANTIATE_GLCALL(void, glNamedBufferData, (GLuint buffer, GLsizei size, const void* data, GLenum usage));
+#define glNamedBufferData hogl_glNamedBufferData
 INSTANTIATE_GLCALL(void, glBufferStorage, (GLenum target, GLsizeiptr size, const GLvoid* data, GLbitfield flags));
+#define glBufferStorage hogl_glBufferStorage
 INSTANTIATE_GLCALL(void, glNamedBufferStorage, (GLuint buffer, GLsizei size, const void* data, GLbitfield flags));
+#define glNamedBufferStorage hogl_glNamedBufferStorage
 INSTANTIATE_GLCALL(void, glBufferSubData, (GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid* data));
+#define glBufferSubData hogl_glBufferSubData
 INSTANTIATE_GLCALL(void, glNamedBufferSubData, (GLuint buffer, GLintptr offset, GLsizei size, const void* data));
+#define glNamedBufferSubData hogl_glNamedBufferSubData
 INSTANTIATE_GLCALL(void, glClearBufferData, (GLenum target, GLenum internalformat, GLenum format, GLenum type, const void* data));
+#define glClearBufferData hogl_glClearBufferData
 INSTANTIATE_GLCALL(void, glClearNamedBufferData, (GLuint buffer, GLenum internalformat, GLenum format, GLenum type, const void* data));
+#define glClearNamedBufferData hogl_glClearNamedBufferData
 INSTANTIATE_GLCALL(void, glClearBufferSubData, (GLenum target, GLenum internalformat, GLintptr offset, GLsizeiptr size, GLenum format, GLenum type, const void* data));
+#define glClearBufferSubData hogl_glClearBufferSubData
 INSTANTIATE_GLCALL(void, glClearNamedBufferSubData, (GLuint buffer, GLenum internalformat, GLintptr offset, GLsizei size, GLenum format, GLenum type, const void* data));
+#define glClearNamedBufferSubData hogl_glClearNamedBufferSubData
 INSTANTIATE_GLCALL(void, glCopyBufferSubData, (GLenum readTarget, GLenum writeTarget, GLintptr readOffset, GLintptr writeOffset, GLsizeiptr size));
+#define glCopyBufferSubData hogl_glCopyBufferSubData
 INSTANTIATE_GLCALL(void, glCopyNamedBufferSubData, (GLuint readBuffer, GLuint writeBuffer, GLintptr readOffset, GLintptr writeOffset, GLsizei size));
+#define glCopyNamedBufferSubData hogl_glCopyNamedBufferSubData
 INSTANTIATE_GLCALL(void, glCreateBuffers, (GLsizei n, GLuint* buffers));
+#define glCreateBuffers hogl_glCreateBuffers
 INSTANTIATE_GLCALL(void, glCreateVertexArrays, (GLsizei n, GLuint* arrays));
+#define glCreateVertexArrays hogl_glCreateVertexArrays
 INSTANTIATE_GLCALL(void, glDeleteBuffers, (GLsizei n, const GLuint* buffers));
+#define glDeleteBuffers hogl_glDeleteBuffers
 INSTANTIATE_GLCALL(void, glDisableVertexAttribArray, (GLuint index));
+#define glDisableVertexAttribArray hogl_glDisableVertexAttribArray
 INSTANTIATE_GLCALL(void, glDisableVertexArrayAttrib, (GLuint vaobj, GLuint index));
+#define glDisableVertexArrayAttrib hogl_glDisableVertexArrayAttrib
 INSTANTIATE_GLCALL(void, glDrawArraysIndirect, (GLenum mode, const void* indirect));
+#define glDrawArraysIndirect hogl_glDrawArraysIndirect
 INSTANTIATE_GLCALL(void, glDrawArraysInstanced, (GLenum mode, GLint first, GLsizei count, GLsizei primcount));
+#define glDrawArraysInstanced hogl_glDrawArraysInstanced
 INSTANTIATE_GLCALL(void, glDrawArraysInstancedBaseInstance, (GLenum mode, GLint first, GLsizei count, GLsizei primcount, GLuint baseinstance));
+#define glDrawArraysInstancedBaseInstance hogl_glDrawArraysInstancedBaseInstance
 INSTANTIATE_GLCALL(void, glDrawElementsBaseVertex, (GLenum mode, GLsizei count, GLenum type, GLvoid* indices, GLint basevertex));
+#define glDrawElementsBaseVertex hogl_glDrawElementsBaseVertex
 INSTANTIATE_GLCALL(void, glDrawElementsIndirect, (GLenum mode, GLenum type, const void* indirect));
+#define glDrawElementsIndirect hogl_glDrawElementsIndirect
 INSTANTIATE_GLCALL(void, glDrawElementsInstanced, (GLenum mode, GLsizei count, GLenum type, const void* indices, GLsizei primcount));
+#define glDrawElementsInstanced hogl_glDrawElementsInstanced
 INSTANTIATE_GLCALL(void, glDrawElementsInstancedBaseInstance, (GLenum mode, GLsizei count, GLenum type, const void* indices, GLsizei primcount, GLuint baseinstance));
+#define glDrawElementsInstancedBaseInstance hogl_glDrawElementsInstancedBaseInstance
 INSTANTIATE_GLCALL(void, glDrawElementsInstancedBaseVertex, (GLenum mode, GLsizei count, GLenum type, GLvoid* indices, GLsizei primcount, GLint basevertex));
+#define glDrawElementsInstancedBaseVertex hogl_glDrawElementsInstancedBaseVertex
 INSTANTIATE_GLCALL(void, glDrawElementsInstancedBaseVertexBaseInstance, (GLenum mode, GLsizei count, GLenum type, GLvoid* indices, GLsizei primcount, GLint basevertex, GLuint baseinstance));
+#define glDrawElementsInstancedBaseVertexBaseInstance hogl_glDrawElementsInstancedBaseVertexBaseInstance
 INSTANTIATE_GLCALL(void, glDrawRangeElements, (GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid* indices));
+#define glDrawRangeElements hogl_glDrawRangeElements
 INSTANTIATE_GLCALL(void, glDrawRangeElementsBaseVertex, (GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, GLvoid* indices, GLint basevertex));
+#define glDrawRangeElementsBaseVertex hogl_glDrawRangeElementsBaseVertex
 INSTANTIATE_GLCALL(void, glEnableVertexAttribArray, (GLuint index));
+#define glEnableVertexAttribArray hogl_glEnableVertexAttribArray
 INSTANTIATE_GLCALL(void, glEnableVertexArrayAttrib, (GLuint vaobj, GLuint index));
+#define glEnableVertexArrayAttrib hogl_glEnableVertexArrayAttrib
 INSTANTIATE_GLCALL(void, glFlushMappedBufferRange, (GLenum target, GLintptr offset, GLsizeiptr length));
+#define glFlushMappedBufferRange hogl_glFlushMappedBufferRange
 INSTANTIATE_GLCALL(void, glFlushMappedNamedBufferRange, (GLuint buffer, GLintptr offset, GLsizei length));
+#define glFlushMappedNamedBufferRange hogl_glFlushMappedNamedBufferRange
 INSTANTIATE_GLCALL(void, glGenBuffers, (GLsizei n, GLuint* buffers));
+#define glGenBuffers hogl_glGenBuffers
 INSTANTIATE_GLCALL(void, glGetBufferParameteriv, (GLenum target, GLenum value, GLint* data));
+#define glGetBufferParameteriv hogl_glGetBufferParameteriv
 INSTANTIATE_GLCALL(void, glGetBufferParameteri64v, (GLenum target, GLenum value, GLint64* data));
+#define glGetBufferParameteri64v hogl_glGetBufferParameteri64v
 INSTANTIATE_GLCALL(void, glGetNamedBufferParameteriv, (GLuint buffer, GLenum pname, GLint* params));
+#define glGetNamedBufferParameteriv hogl_glGetNamedBufferParameteriv
 INSTANTIATE_GLCALL(void, glGetNamedBufferParameteri64v, (GLuint buffer, GLenum pname, GLint64* params));
+#define glGetNamedBufferParameteri64v hogl_glGetNamedBufferParameteri64v
 INSTANTIATE_GLCALL(void, glGetBufferPointerv, (GLenum target, GLenum pname, GLvoid** params));
+#define glGetBufferPointerv hogl_glGetBufferPointerv
 INSTANTIATE_GLCALL(void, glGetNamedBufferPointerv, (GLuint buffer, GLenum pname, void** params));
+#define glGetNamedBufferPointerv hogl_glGetNamedBufferPointerv
 INSTANTIATE_GLCALL(void, glGetBufferSubData, (GLenum target, GLintptr offset, GLsizeiptr size, GLvoid* data));
+#define glGetBufferSubData hogl_glGetBufferSubData
 INSTANTIATE_GLCALL(void, glGetNamedBufferSubData, (GLuint buffer, GLintptr offset, GLsizei size, void* data));
+#define glGetNamedBufferSubData hogl_glGetNamedBufferSubData
 INSTANTIATE_GLCALL(void, glGetVertexArrayIndexediv, (GLuint vaobj, GLuint index, GLenum pname, GLint* param));
+#define glGetVertexArrayIndexediv hogl_glGetVertexArrayIndexediv
 INSTANTIATE_GLCALL(void, glGetVertexArrayIndexed64iv, (GLuint vaobj, GLuint index, GLenum pname, GLint64* param));
+#define glGetVertexArrayIndexed64iv hogl_glGetVertexArrayIndexed64iv
 INSTANTIATE_GLCALL(void, glGetVertexArrayiv, (GLuint vaobj, GLenum pname, GLint* param));
+#define glGetVertexArrayiv hogl_glGetVertexArrayiv
 INSTANTIATE_GLCALL(void, glGetVertexAttribdv, (GLuint index, GLenum pname, GLdouble* params));
+#define glGetVertexAttribdv hogl_glGetVertexAttribdv
 INSTANTIATE_GLCALL(void, glGetVertexAttribfv, (GLuint index, GLenum pname, GLfloat* params));
+#define glGetVertexAttribfv hogl_glGetVertexAttribfv
 INSTANTIATE_GLCALL(void, glGetVertexAttribiv, (GLuint index, GLenum pname, GLint* params));
+#define glGetVertexAttribiv hogl_glGetVertexAttribiv
 INSTANTIATE_GLCALL(void, glGetVertexAttribIiv, (GLuint index, GLenum pname, GLint* params));
+#define glGetVertexAttribIiv hogl_glGetVertexAttribIiv
 INSTANTIATE_GLCALL(void, glGetVertexAttribIuiv, (GLuint index, GLenum pname, GLuint* params));
+#define glGetVertexAttribIuiv hogl_glGetVertexAttribIuiv
 INSTANTIATE_GLCALL(void, glGetVertexAttribLdv, (GLuint index, GLenum pname, GLdouble* params));
+#define glGetVertexAttribLdv hogl_glGetVertexAttribLdv
 INSTANTIATE_GLCALL(void, glGetVertexAttribPointerv, (GLuint index, GLenum pname, GLvoid** pointer));
+#define glGetVertexAttribPointerv hogl_glGetVertexAttribPointerv
 INSTANTIATE_GLCALL(void, glInvalidateBufferData, (GLuint buffer));
+#define glInvalidateBufferData hogl_glInvalidateBufferData
 INSTANTIATE_GLCALL(void, glInvalidateBufferSubData, (GLuint buffer, GLintptr offset, GLsizeiptr length));
+#define glInvalidateBufferSubData hogl_glInvalidateBufferSubData
 INSTANTIATE_GLCALL(GLboolean, glIsBuffer, (GLuint buffer));
+#define glIsBuffer hogl_glIsBuffer
 INSTANTIATE_GLCALL(void*, glMapBuffer, (GLenum target, GLenum access));
+#define glMapBuffer hogl_glMapBuffer
 INSTANTIATE_GLCALL(void*, glMapNamedBuffer, (GLuint buffer, GLenum access));
+#define glMapNamedBuffer hogl_glMapNamedBuffer
 INSTANTIATE_GLCALL(void*, glMapBufferRange, (GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access));
+#define glMapBufferRange hogl_glMapBufferRange
 INSTANTIATE_GLCALL(void*, glMapNamedBufferRange, (GLuint buffer, GLintptr offset, GLsizei length, GLbitfield access));
+#define glMapNamedBufferRange hogl_glMapNamedBufferRange
 INSTANTIATE_GLCALL(void, glMultiDrawArrays, (GLenum mode, const GLint* first, const GLsizei* count, GLsizei drawcount));
+#define glMultiDrawArrays hogl_glMultiDrawArrays
 INSTANTIATE_GLCALL(void, glMultiDrawArraysIndirect, (GLenum mode, const void* indirect, GLsizei drawcount, GLsizei stride));
+#define glMultiDrawArraysIndirect hogl_glMultiDrawArraysIndirect
 INSTANTIATE_GLCALL(void, glMultiDrawElements, (GLenum mode, const GLsizei* count, GLenum type, const GLvoid* const * indices, GLsizei drawcount));
+#define glMultiDrawElements hogl_glMultiDrawElements
 INSTANTIATE_GLCALL(void, glMultiDrawElementsBaseVertex, (GLenum mode, const GLsizei* count, GLenum type, const GLvoid* const *indices, GLsizei drawcount, const GLint* basevertex));
+#define glMultiDrawElementsBaseVertex hogl_glMultiDrawElementsBaseVertex
 INSTANTIATE_GLCALL(void, glMultiDrawElementsIndirect, (GLenum mode, GLenum type, const void* indirect, GLsizei drawcount, GLsizei stride));
+#define glMultiDrawElementsIndirect hogl_glMultiDrawElementsIndirect
 INSTANTIATE_GLCALL(void, glPatchParameteri, (GLenum pname, GLint value));
+#define glPatchParameteri hogl_glPatchParameteri
 INSTANTIATE_GLCALL(void, glPatchParameterfv, (GLenum pname, const GLfloat* values));
+#define glPatchParameterfv hogl_glPatchParameterfv
 INSTANTIATE_GLCALL(void, glPrimitiveRestartIndex, (GLuint index));
+#define glPrimitiveRestartIndex hogl_glPrimitiveRestartIndex
 INSTANTIATE_GLCALL(void, glProvokingVertex, (GLenum provokeMode));
+#define glProvokingVertex hogl_glProvokingVertex
 INSTANTIATE_GLCALL(GLboolean, glUnmapBuffer, (GLenum target));
+#define glUnmapBuffer hogl_glUnmapBuffer
 INSTANTIATE_GLCALL(GLboolean, glUnmapNamedBuffer, (GLuint buffer));
+#define glUnmapNamedBuffer hogl_glUnmapNamedBuffer
 INSTANTIATE_GLCALL(void, glVertexArrayElementBuffer, (GLuint vaobj, GLuint buffer));
+#define glVertexArrayElementBuffer hogl_glVertexArrayElementBuffer
 INSTANTIATE_GLCALL(void, glVertexAttrib1f, (GLuint index, GLfloat v0));
+#define glVertexAttrib1f hogl_glVertexAttrib1f
 INSTANTIATE_GLCALL(void, glVertexAttrib1s, (GLuint index, GLshort v0));
+#define glVertexAttrib1s hogl_glVertexAttrib1s
 INSTANTIATE_GLCALL(void, glVertexAttrib1d, (GLuint index, GLdouble v0));
+#define glVertexAttrib1d hogl_glVertexAttrib1d
 INSTANTIATE_GLCALL(void, glVertexAttribI1i, (GLuint index, GLint v0));
+#define glVertexAttribI1i hogl_glVertexAttribI1i
 INSTANTIATE_GLCALL(void, glVertexAttribI1ui, (GLuint index, GLuint v0));
+#define glVertexAttribI1ui hogl_glVertexAttribI1ui
 INSTANTIATE_GLCALL(void, glVertexAttrib2f, (GLuint index, GLfloat v0, GLfloat v1));
+#define glVertexAttrib2f hogl_glVertexAttrib2f
 INSTANTIATE_GLCALL(void, glVertexAttrib2s, (GLuint index, GLshort v0, GLshort v1));
+#define glVertexAttrib2s hogl_glVertexAttrib2s
 INSTANTIATE_GLCALL(void, glVertexAttrib2d, (GLuint index, GLdouble v0, GLdouble v1));
+#define glVertexAttrib2d hogl_glVertexAttrib2d
 INSTANTIATE_GLCALL(void, glVertexAttribI2i, (GLuint index, GLint v0, GLint v1));
+#define glVertexAttribI2i hogl_glVertexAttribI2i
 INSTANTIATE_GLCALL(void, glVertexAttribI2ui, (GLuint index, GLint v0, GLint v1));
+#define glVertexAttribI2ui hogl_glVertexAttribI2ui
 INSTANTIATE_GLCALL(void, glVertexAttrib3f, (GLuint index, GLfloat v0, GLfloat v1, GLfloat v2));
+#define glVertexAttrib3f hogl_glVertexAttrib3f
 INSTANTIATE_GLCALL(void, glVertexAttrib3s, (GLuint index, GLshort v0, GLshort v1, GLshort v2));
+#define glVertexAttrib3s hogl_glVertexAttrib3s
 INSTANTIATE_GLCALL(void, glVertexAttrib3d, (GLuint index, GLdouble v0, GLdouble v1, GLdouble v2));
+#define glVertexAttrib3d hogl_glVertexAttrib3d
 INSTANTIATE_GLCALL(void, glVertexAttribI3i, (GLuint index, GLint v0, GLint v1, GLint v2));
+#define glVertexAttribI3i hogl_glVertexAttribI3i
 INSTANTIATE_GLCALL(void, glVertexAttribI3ui, (GLuint index, GLuint v0, GLuint v1, GLuint v2));
+#define glVertexAttribI3ui hogl_glVertexAttribI3ui
 INSTANTIATE_GLCALL(void, glVertexAttrib4f, (GLuint index, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3));
+#define glVertexAttrib4f hogl_glVertexAttrib4f
 INSTANTIATE_GLCALL(void, glVertexAttrib4s, (GLuint index, GLshort v0, GLshort v1, GLshort v2, GLshort v3));
+#define glVertexAttrib4s hogl_glVertexAttrib4s
 INSTANTIATE_GLCALL(void, glVertexAttrib4d, (GLuint index, GLdouble v0, GLdouble v1, GLdouble v2, GLdouble v3));
+#define glVertexAttrib4d hogl_glVertexAttrib4d
 INSTANTIATE_GLCALL(void, glVertexAttrib4Nub, (GLuint index, GLubyte v0, GLubyte v1, GLubyte v2, GLubyte v3));
+#define glVertexAttrib4Nub hogl_glVertexAttrib4Nub
 INSTANTIATE_GLCALL(void, glVertexAttribI4i, (GLuint index, GLint v0, GLint v1, GLint v2, GLint v3));
+#define glVertexAttribI4i hogl_glVertexAttribI4i
 INSTANTIATE_GLCALL(void, glVertexAttribI4ui, (GLuint index, GLuint v0, GLuint v1, GLuint v2, GLuint v3));
+#define glVertexAttribI4ui hogl_glVertexAttribI4ui
 INSTANTIATE_GLCALL(void, glVertexAttribL1d, (GLuint index, GLdouble v0));
+#define glVertexAttribL1d hogl_glVertexAttribL1d
 INSTANTIATE_GLCALL(void, glVertexAttribL2d, (GLuint index, GLdouble v0, GLdouble v1));
+#define glVertexAttribL2d hogl_glVertexAttribL2d
 INSTANTIATE_GLCALL(void, glVertexAttribL3d, (GLuint index, GLdouble v0, GLdouble v1, GLdouble v2));
+#define glVertexAttribL3d hogl_glVertexAttribL3d
 INSTANTIATE_GLCALL(void, glVertexAttribL4d, (GLuint index, GLdouble v0, GLdouble v1, GLdouble v2, GLdouble v3));
+#define glVertexAttribL4d hogl_glVertexAttribL4d
 INSTANTIATE_GLCALL(void, glVertexAttrib1fv, (GLuint index, const GLfloat* v));
+#define glVertexAttrib1fv hogl_glVertexAttrib1fv
 INSTANTIATE_GLCALL(void, glVertexAttrib1sv, (GLuint index, const GLshort* v));
+#define glVertexAttrib1sv hogl_glVertexAttrib1sv
 INSTANTIATE_GLCALL(void, glVertexAttrib1dv, (GLuint index, const GLdouble* v));
+#define glVertexAttrib1dv hogl_glVertexAttrib1dv
 INSTANTIATE_GLCALL(void, glVertexAttribI1iv, (GLuint index, const GLint* v));
+#define glVertexAttribI1iv hogl_glVertexAttribI1iv
 INSTANTIATE_GLCALL(void, glVertexAttribI1uiv, (GLuint index, const GLuint* v));
+#define glVertexAttribI1uiv hogl_glVertexAttribI1uiv
 INSTANTIATE_GLCALL(void, glVertexAttrib2fv, (GLuint index, const GLfloat* v));
+#define glVertexAttrib2fv hogl_glVertexAttrib2fv
 INSTANTIATE_GLCALL(void, glVertexAttrib2sv, (GLuint index, const GLshort* v));
+#define glVertexAttrib2sv hogl_glVertexAttrib2sv
 INSTANTIATE_GLCALL(void, glVertexAttrib2dv, (GLuint index, const GLdouble* v));
+#define glVertexAttrib2dv hogl_glVertexAttrib2dv
 INSTANTIATE_GLCALL(void, glVertexAttribI2iv, (GLuint index, const GLint* v));
+#define glVertexAttribI2iv hogl_glVertexAttribI2iv
 INSTANTIATE_GLCALL(void, glVertexAttribI2uiv, (GLuint index, const GLuint* v));
+#define glVertexAttribI2uiv hogl_glVertexAttribI2uiv
 INSTANTIATE_GLCALL(void, glVertexAttrib3fv, (GLuint index, const GLfloat* v));
+#define glVertexAttrib3fv hogl_glVertexAttrib3fv
 INSTANTIATE_GLCALL(void, glVertexAttrib3sv, (GLuint index, const GLshort* v));
+#define glVertexAttrib3sv hogl_glVertexAttrib3sv
 INSTANTIATE_GLCALL(void, glVertexAttrib3dv, (GLuint index, const GLdouble* v));
+#define glVertexAttrib3dv hogl_glVertexAttrib3dv
 INSTANTIATE_GLCALL(void, glVertexAttribI3iv, (GLuint index, const GLint *v));
+#define glVertexAttribI3iv hogl_glVertexAttribI3iv
 INSTANTIATE_GLCALL(void, glVertexAttribI3uiv, (GLuint index, const GLuint* v));
+#define glVertexAttribI3uiv hogl_glVertexAttribI3uiv
 INSTANTIATE_GLCALL(void, glVertexAttrib4fv, (GLuint index, const GLfloat* v));
+#define glVertexAttrib4fv hogl_glVertexAttrib4fv
 INSTANTIATE_GLCALL(void, glVertexAttrib4sv, (GLuint index, const GLshort* v));
+#define glVertexAttrib4sv hogl_glVertexAttrib4sv
 INSTANTIATE_GLCALL(void, glVertexAttrib4dv, (GLuint index, const GLdouble* v));
+#define glVertexAttrib4dv hogl_glVertexAttrib4dv
 INSTANTIATE_GLCALL(void, glVertexAttrib4iv, (GLuint index, const GLint* v));
+#define glVertexAttrib4iv hogl_glVertexAttrib4iv
 INSTANTIATE_GLCALL(void, glVertexAttrib4bv, (GLuint index, const GLbyte* v));
+#define glVertexAttrib4bv hogl_glVertexAttrib4bv
 INSTANTIATE_GLCALL(void, glVertexAttrib4ubv, (GLuint index, const GLubyte* v));
+#define glVertexAttrib4ubv hogl_glVertexAttrib4ubv
 INSTANTIATE_GLCALL(void, glVertexAttrib4usv, (GLuint index, const GLushort* v));
+#define glVertexAttrib4usv hogl_glVertexAttrib4usv
 INSTANTIATE_GLCALL(void, glVertexAttrib4uiv, (GLuint index, const GLuint* v));
+#define glVertexAttrib4uiv hogl_glVertexAttrib4uiv
 INSTANTIATE_GLCALL(void, glVertexAttrib4Nbv, (GLuint index, const GLbyte* v));
+#define glVertexAttrib4Nbv hogl_glVertexAttrib4Nbv
 INSTANTIATE_GLCALL(void, glVertexAttrib4Nsv, (GLuint index, const GLshort* v));
+#define glVertexAttrib4Nsv hogl_glVertexAttrib4Nsv
 INSTANTIATE_GLCALL(void, glVertexAttrib4Niv, (GLuint index, const GLint* v));
+#define glVertexAttrib4Niv hogl_glVertexAttrib4Niv
 INSTANTIATE_GLCALL(void, glVertexAttrib4Nubv, (GLuint index, const GLubyte* v));
+#define glVertexAttrib4Nubv hogl_glVertexAttrib4Nubv
 INSTANTIATE_GLCALL(void, glVertexAttrib4Nusv, (GLuint index, const GLushort* v));
+#define glVertexAttrib4Nusv hogl_glVertexAttrib4Nusv
 INSTANTIATE_GLCALL(void, glVertexAttrib4Nuiv, (GLuint index, const GLuint* v));
+#define glVertexAttrib4Nuiv hogl_glVertexAttrib4Nuiv
 INSTANTIATE_GLCALL(void, glVertexAttribI4bv, (GLuint index, const GLbyte* v));
+#define glVertexAttribI4bv hogl_glVertexAttribI4bv
 INSTANTIATE_GLCALL(void, glVertexAttribI4ubv, (GLuint index, const GLubyte* v));
+#define glVertexAttribI4ubv hogl_glVertexAttribI4ubv
 INSTANTIATE_GLCALL(void, glVertexAttribI4sv, (GLuint index, const GLshort* v));
+#define glVertexAttribI4sv hogl_glVertexAttribI4sv
 INSTANTIATE_GLCALL(void, glVertexAttribI4usv, (GLuint index, const GLushort* v));
+#define glVertexAttribI4usv hogl_glVertexAttribI4usv
 INSTANTIATE_GLCALL(void, glVertexAttribI4iv, (GLuint index, const GLint* v));
+#define glVertexAttribI4iv hogl_glVertexAttribI4iv
 INSTANTIATE_GLCALL(void, glVertexAttribI4uiv, (GLuint index, const GLuint* v));
+#define glVertexAttribI4uiv hogl_glVertexAttribI4uiv
 INSTANTIATE_GLCALL(void, glVertexAttribL1dv, (GLuint index, const GLdouble* v));
+#define glVertexAttribL1dv hogl_glVertexAttribL1dv
 INSTANTIATE_GLCALL(void, glVertexAttribL2dv, (GLuint index, const GLdouble* v));
+#define glVertexAttribL2dv hogl_glVertexAttribL2dv
 INSTANTIATE_GLCALL(void, glVertexAttribL3dv, (GLuint index, const GLdouble* v));
+#define glVertexAttribL3dv hogl_glVertexAttribL3dv
 INSTANTIATE_GLCALL(void, glVertexAttribL4dv, (GLuint index, const GLdouble* v));
+#define glVertexAttribL4dv hogl_glVertexAttribL4dv
 INSTANTIATE_GLCALL(void, glVertexAttribP1ui, (GLuint index,	GLenum type, GLboolean normalized, GLuint value));
+#define glVertexAttribP1ui hogl_glVertexAttribP1ui
 INSTANTIATE_GLCALL(void, glVertexAttribP2ui, (GLuint index, GLenum type, GLboolean normalized, GLuint value));
+#define glVertexAttribP2ui hogl_glVertexAttribP2ui
 INSTANTIATE_GLCALL(void, glVertexAttribP3ui, (GLuint index, GLenum type, GLboolean normalized, GLuint value));
+#define glVertexAttribP3ui hogl_glVertexAttribP3ui
 INSTANTIATE_GLCALL(void, glVertexAttribP4ui, (GLuint index, GLenum type, GLboolean normalized, GLuint value));
+#define glVertexAttribP4ui hogl_glVertexAttribP4ui
 INSTANTIATE_GLCALL(void, glVertexAttribBinding, (GLuint attribindex, GLuint bindingindex));
+#define glVertexAttribBinding hogl_glVertexAttribBinding
 INSTANTIATE_GLCALL(void, glVertexArrayAttribBinding, (GLuint vaobj, GLuint attribindex, GLuint bindingindex));
+#define glVertexArrayAttribBinding hogl_glVertexArrayAttribBinding
 INSTANTIATE_GLCALL(void, glVertexAttribDivisor, (GLuint index, GLuint divisor));
+#define glVertexAttribDivisor hogl_glVertexAttribDivisor
 INSTANTIATE_GLCALL(void, glVertexAttribFormat, (GLuint attribindex, GLint size, GLenum type, GLboolean normalized, GLuint relativeoffset));
+#define glVertexAttribFormat hogl_glVertexAttribFormat
 INSTANTIATE_GLCALL(void, glVertexAttribIFormat, (GLuint attribindex, GLint size, GLenum type, GLuint relativeoffset));
+#define glVertexAttribIFormat hogl_glVertexAttribIFormat
 INSTANTIATE_GLCALL(void, glVertexAttribLFormat, (GLuint attribindex, GLint size, GLenum type, GLuint relativeoffset));
+#define glVertexAttribLFormat hogl_glVertexAttribLFormat
 INSTANTIATE_GLCALL(void, glVertexArrayAttribFormat, (GLuint vaobj, GLuint attribindex, GLint size, GLenum type, GLboolean normalized, GLuint relativeoffset));
+#define glVertexArrayAttribFormat hogl_glVertexArrayAttribFormat
 INSTANTIATE_GLCALL(void, glVertexArrayAttribIFormat, (GLuint vaobj, GLuint attribindex, GLint size, GLenum type, GLuint relativeoffset));
+#define glVertexArrayAttribIFormat hogl_glVertexArrayAttribIFormat
 INSTANTIATE_GLCALL(void, glVertexArrayAttribLFormat, (GLuint vaobj, GLuint attribindex, GLint size, GLenum type, GLuint relativeoffset));
+#define glVertexArrayAttribLFormat hogl_glVertexArrayAttribLFormat
 INSTANTIATE_GLCALL(void, glVertexAttribPointer, (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* pointer));
+#define glVertexAttribPointer hogl_glVertexAttribPointer
 INSTANTIATE_GLCALL(void, glVertexAttribIPointer, (GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid* pointer));
+#define glVertexAttribIPointer hogl_glVertexAttribIPointer
 INSTANTIATE_GLCALL(void, glVertexAttribLPointer, (GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid* pointer));
+#define glVertexAttribLPointer hogl_glVertexAttribLPointer
 INSTANTIATE_GLCALL(void, glVertexBindingDivisor, (GLuint bindingindex, GLuint divisor));
+#define glVertexBindingDivisor hogl_glVertexBindingDivisor
 INSTANTIATE_GLCALL(void, glVertexArrayBindingDivisor, (GLuint vaobj, GLuint bindingindex, GLuint divisor));
+#define glVertexArrayBindingDivisor hogl_glVertexArrayBindingDivisor
 
 extern int hogl_init_gl_extensions() {
 	// Rendering
@@ -2776,9 +3330,10 @@ extern int hogl_init_gl_extensions() {
 	LOAD_GL_PROC(glVertexAttribLPointer);
 	LOAD_GL_PROC(glVertexBindingDivisor);
 	LOAD_GL_PROC(glVertexArrayBindingDivisor);
-
 	return 0;
 }
+
+#if defined(_WIN32) || defined(_WIN64)
 
 extern int hogl_init_opengl(Window_Info* window_info, int major, int minor) {
 	int PixelFormat;
@@ -2828,7 +3383,6 @@ extern int hogl_init_opengl(Window_Info* window_info, int major, int minor) {
 	return 0;
 }
 #elif defined(__linux__)
-
 #endif
 
 #endif	// HOGL_IMPLEMENT
