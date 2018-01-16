@@ -1577,7 +1577,7 @@ if(!(hogl_##X)) hogl_##X = (X##_proctype*)GetProcAddress(glcode, #X)
 #elif defined(__linux__)
 #define LOAD_GL_PROC(X) \
 hogl_##X = (X##_proctype*)glXGetProcAddress((const GLubyte*)#X); \
-if(!(hogl_##X)) hogl_##X = X
+if(!(hogl_##X)) hogl_##X = 0 
 
 #define GL_CALL
 #endif
@@ -2209,10 +2209,14 @@ INSTANTIATE_GLCALL(void, glVertexBindingDivisor, (GLuint bindingindex, GLuint di
 INSTANTIATE_GLCALL(void, glVertexArrayBindingDivisor, (GLuint vaobj, GLuint bindingindex, GLuint divisor));
 
 extern int hogl_init_gl_extensions() {
+	#if defined (_WIN32) || defined(_WIN64)
 	HMODULE glcode = LoadLibraryA("opengl32.dll");
 	if (!glcode) {
 		return -1;
 	}
+	#elif defined(__linux__)
+	
+	#endif
 
 	// Rendering
 	LOAD_GL_PROC(glClear);					// opengl32.dll
@@ -2852,7 +2856,10 @@ extern int hogl_init_gl_extensions() {
 	LOAD_GL_PROC(glVertexBindingDivisor);
 	LOAD_GL_PROC(glVertexArrayBindingDivisor);
 
+	#if defined (_WIN32) || defined(_WIN64)
 	FreeLibrary(glcode);
+	#elif defined(__linux__)
+	#endif
 	return 0;
 }
 
