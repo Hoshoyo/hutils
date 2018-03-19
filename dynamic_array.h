@@ -113,10 +113,11 @@ HO_EXPORT void HO_API array_remove(void* array_, size_t index)
 	size_t capacity = base->capacity;
 	size_t length = base->length;
 	size_t size_element = base->size_element;
-
-	void* dst = (char*)array_ + index * size_element;
-	void* from = (char*)array_ + ((length - 1) * size_element);
-	memcpy(dst, from, size_element);
+	if(length > 1){
+		void* dst = (char*)array_ + index * size_element;
+		void* from = (char*)array_ + ((length - 1) * size_element);
+		memcpy(dst, from, size_element);
+	}
 	base->length--;
 }
 
