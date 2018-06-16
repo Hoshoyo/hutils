@@ -7,15 +7,17 @@
 */
 
 /*
-    define FAST_DYNAMIC_ARRAY_NO_CRT if you don't want the c runtime library included
+    define LIGHT_ARRAY_NO_CRT if you don't want the c runtime library included
     if that is defined, you must provide implementations for the following functions:
     void* calloc(size_t num, size_t size)
     void* realloc(void* ptr, size_t new_size)
     void free(void* block)
     void* memcpy(void* dest, void* src, size_t count)
+
+    define LIGHT_ARRAY_64BIT for a 64 bit version of the library
 */
 
-#if !defined(FAST_DYNAMIC_ARRAY_NO_CRT)
+#if !defined(LIGHT_ARRAY_NO_CRT)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,12 +61,17 @@
 */
 
 typedef struct {
+#ifdef LIGHT_ARRAY_64BIT
+    unsigned long long capacity;
+    unsigned long long length;
+#else
     unsigned int capacity;
     unsigned int length;
+#endif
 } Dynamic_ArrayBase;
 
-#define MIN(x, y) (y ^ ((x ^ y) & -(x < y)))
-#define MAX(x, y) (x ^ ((x ^ y) & -(x < y)))
+#define LIGHT_ARRAY_MIN(x, y) (y ^ ((x ^ y) & -(x < y)))
+#define LIGHT_ARRAY_MAX(x, y) (x ^ ((x ^ y) & -(x < y)))
 
 #define array_base(A) ((Dynamic_ArrayBase*)(((char*)(A)) - sizeof(Dynamic_ArrayBase)))
 #define array_length(A) array_base(A)->length
@@ -72,14 +79,14 @@ typedef struct {
 #if defined(__cplusplus)
 #define array_new(T) (T*)((char*)&(((Dynamic_ArrayBase*)calloc(1, sizeof(Dynamic_ArrayBase) + sizeof(T)))->capacity = 1) + sizeof(Dynamic_ArrayBase))
 #else
-static void* dyn_allocate(size_t size) {
+static void* array_dyn_allocate(size_t size) {
     void* res = calloc(1, size);
     ((Dynamic_ArrayBase*)res)->capacity = 1;
     return (void*)((char*)res + sizeof(Dynamic_ArrayBase));
 }
-#define array_new(T) dyn_allocate(sizeof(T) + sizeof(Dynamic_ArrayBase))
+#define array_new(T) array_dyn_allocate(sizeof(T) + sizeof(Dynamic_ArrayBase))
 #endif
-#define array_push(A, V) ((array_length(A) == array_capacity(A)) ? array_capacity(A) = MAX(2 * array_length(A), 2), \
+#define array_push(A, V) ((array_length(A) == array_capacity(A)) ? array_capacity(A) = LIGHT_ARRAY_MAX(2 * array_length(A), 2), \
 *((void**)&(A)) = ((char*)realloc(array_base(A), sizeof(Dynamic_ArrayBase) + array_capacity(A) * sizeof(*(A))) + sizeof(Dynamic_ArrayBase)) : 0, \
 (A)[array_length(A)++] = (V))
 #define array_pop(A) (A)[--array_length(A)]
@@ -89,7 +96,4 @@ static void* dyn_allocate(size_t size) {
 memcpy(((char*)A) + sizeof(*(A)) * (Index), ((char*)A) + sizeof(*(A)) * ((Index) + 1), sizeof(*buffer) * (array_length(A) - (Index))))
 #define array_remove(A, Index) (array_length(A)--, (A)[Index] = (A)[array_length(A)])
 
-#undef MIN
-#undef MAX
-
-#endif // H_FAST_DYNAMIC_ARRAY
+#endif /* H_FAST_DYNAMIC_ARRAY */
