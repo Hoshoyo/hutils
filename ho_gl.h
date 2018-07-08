@@ -1563,7 +1563,6 @@ typedef void (APIENTRY  *GLDEBUGPROC)(GLenum source, GLenum type, GLuint id, GLe
 #define GL_TRANSFORM_FEEDBACK_STREAM_OVERFLOW 0x82ED
 #endif /* GL_VERSION_4_6 */
 
-#define HOGL_IMPLEMENT
 #ifdef HOGL_IMPLEMENT
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -1582,9 +1581,15 @@ if(!(hogl_##X)) hogl_##X = 0
 #define GL_CALL
 #endif
 
+#ifdef HOGL_IMPLEMENT
 #define INSTANTIATE_GLCALL(R, X, A) \
 typedef R GL_CALL X##_proctype A;	\
 X##_proctype* hogl_##X = 0
+#else
+#define INSTANTIATE_GLCALL(R, X, A) \
+typedef R GL_CALL X##_proctype A;   \
+extern X##_proctype* hogl_##X;
+#endif
 
 INSTANTIATE_GLCALL(void, glClear, (GLbitfield mask));
 INSTANTIATE_GLCALL(void, glClearBufferiv, (GLenum buffer, GLint drawbuffer, const GLint* value));
