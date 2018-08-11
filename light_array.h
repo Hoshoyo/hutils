@@ -86,7 +86,7 @@ static void* array_dyn_allocate(size_t size) {
 }
 #define array_new(T) array_dyn_allocate(sizeof(T) + sizeof(Dynamic_ArrayBase))
 #endif
-#define array_push(A, V) ((array_length(A) == array_capacity(A)) ? array_capacity(A) = LIGHT_ARRAY_MAX(2 * array_length(A), 2), \
+#define array_push(A, V) (((array_length(A) + 1) == array_capacity(A)) ? array_capacity(A) = LIGHT_ARRAY_MAX(2 * array_length(A), 2), \
 *((void**)&(A)) = ((char*)realloc(array_base(A), sizeof(Dynamic_ArrayBase) + array_capacity(A) * sizeof(*(A))) + sizeof(Dynamic_ArrayBase)) : 0, \
 (A)[array_length(A)++] = (V))
 #define array_pop(A) (array_length(A) > 0) ? (A)[--array_length(A)] : 0

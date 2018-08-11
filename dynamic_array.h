@@ -157,7 +157,7 @@ HO_EXPORT size_t HO_API _array_push(void** array_, void* data)
 	size_t length = base->length;
 	size_t size_element = base->size_element;
 
-	if (length == capacity)
+	if ((length + 1) == capacity)
 	{
 		capacity *= 2;
 		base->capacity = capacity;
