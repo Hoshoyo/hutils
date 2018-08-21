@@ -90,11 +90,16 @@ static void* array_dyn_allocate(size_t size) {
     ? *((void**)&(A)) = (void*)((Dynamic_ArrayBase*)realloc((Dynamic_ArrayBase*)(A) - 1, sizeof(Dynamic_ArrayBase) + sizeof(*(A)) * array_capacity(A) * 2) + 1), \
     array_capacity(A) = array_capacity(A) * 2 : 0, \
     (A)[array_length(A)++] = (V))
+
 #define array_pop(A) (array_length(A) > 0) ? (A)[--array_length(A)] : 0
+
 #define array_free(A) free(array_base(A))
+
 #define array_clear(A) array_length(A) = 0
-#define array_remove_ordered(A, Index) (array_length(A)--, \
-memcpy(((char*)A) + sizeof(*(A)) * (Index), ((char*)A) + sizeof(*(A)) * ((Index) + 1), sizeof(*buffer) * (array_length(A) - (Index))))
+
+#define array_remove_ordered(A, Index) ((Index) < (array_length(A) - 1) && array_length(A) > 0) ? \
+    memmove((A) + Index, (A) + Index + 1, (array_length(A) - 1 - Index) * sizeof(*A)) : 0, array_length(A)--
+
 #define array_remove(A, Index) (array_length(A)--, (A)[Index] = (A)[array_length(A)])
 
 #endif /* H_FAST_DYNAMIC_ARRAY */
