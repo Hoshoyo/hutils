@@ -91,6 +91,8 @@ static void* array_dyn_allocate(size_t size) {
     array_capacity(A) = array_capacity(A) * 2 : 0, \
     (A)[array_length(A)++] = (V))
 
+#define array_insert(A, V, I) array_push(A, V), memmove((A) + (I) + 1, (A) + (I), sizeof(*A) * (array_length(A) - (I) - 1)), (A)[I] = (V)
+
 #define array_pop(A) (array_length(A) > 0) ? (A)[--array_length(A)] : 0
 
 #define array_free(A) free(array_base(A))
