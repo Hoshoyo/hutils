@@ -81,15 +81,12 @@ arena_alloc(Light_Arena* arena, size_t size_bytes) {
     if (size_bytes + arena_size(arena->last) > arena->last->capacity) {
         Light_Arena* narena = arena_create(arena->capacity);
         arena->last->next = narena;
-        arena->last->next = narena;
         arena->last = narena;
 		arena->ptr = narena->ptr;
-		result = narena->ptr;
-    } else {
-        result = arena->last->ptr;
-        arena->last->ptr = (char*)arena->last->ptr + size_bytes;
     }
 #undef arena_size
+    result = arena->last->ptr;
+    arena->last->ptr = (char*)arena->last->ptr + size_bytes;
     return result;
 }
 
