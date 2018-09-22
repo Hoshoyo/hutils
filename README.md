@@ -1,6 +1,6 @@
 # hutils - Utilities for C/C++ programming
 
-## [Light Array](https://github.com/Hoshoyo/hutils/blob/master/light_arena.h)
+## [Light Array](https://github.com/Hoshoyo/hutils/blob/master/light_array.h)
 
 A fast dynamic array library for `C/C++` similar to C++'s `std::vector`.
 
