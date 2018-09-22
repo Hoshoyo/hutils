@@ -75,3 +75,7 @@ int main(int argc, char** argv) {
 ## Ho Math (Deprecated)
 
 A math library for `C++`.
+
+## Dynamic Array (Deprecated)
+
+A fast dynamic array library for `C/C++`.
