@@ -1,64 +1,107 @@
-#ifndef HO_MEMORY_ARENA
-#define HO_MEMORY_ARENA
+#ifndef H_LIGHT_ARENA
+#define H_LIGHT_ARENA
 
 /*
     Author: Pedro Sassen Veiga
+    The MIT License
+
     This library is C89 compatible
+
+    ----------------------------------------------------------------------------------
+
+    define LIGHT_ARENA_NO_CRT if you don't want the c runtime library included
+    if that is defined, you must provide implementations for the following functions:
+
+    void* calloc(size_t num, size_t size)
+    void  free(void* block)
+
+    ----------------------------------------------------------------------------------
+
+    Usage:
+    An example usage of creating, allocating and freeing an arena:
+
+    #include "light_arena.h"
+
+    int main(int argc, char** argv)
+    {
+        Light_Arena* arena = arena_create(512);
+
+        void* m1 = arena_alloc(arena, 64);
+        void* m2 = arena_alloc(arena, 84);
+
+        arena_free(arena);
+
+        return 0;
+    }
+
+    The arena will grow and is not limited by the block size, new blocks will be allocated
+    incrementing by the initial size each time.
 */
 
 #if !defined(LIGHT_ARENA_NO_CRT)
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#endif
+
+#if defined(LIGHT_ARENA_EXPORT)
+#ifdef __cplusplus
+#define LIGHT_ARENA_API extern "C"
+#else
+#define LIGHT_ARENA_API extern
+#endif
+#else
+#define LIGHT_ARENA_API static
 #endif
 
 typedef struct Light_Arena_t{
-#ifdef LIGHT_ARRAY_64BIT
-    unsigned long long capacity;
-#else
-    unsigned int capacity;
-#endif
-    void* ptr;
+    size_t capacity;
+    void*  ptr;
     struct Light_Arena_t* next;
     struct Light_Arena_t* last;
 } Light_Arena;
 
-#define LIGHT_ARENA_MIN(x, y) (y ^ ((x ^ y) & -(x < y)))
-#define LIGHT_ARENA_MAX(x, y) (x ^ ((x ^ y) & -(x < y)))
-
-#define arena_ptr(A) (A)->ptr
-#define arena_capacity(A) (A)->capacity
-#define arena_size(A) ((char*)((A)->ptr) - (char*)(A) + sizeof(Light_Arena))
-
-static Light_Arena* 
+/* creates an arena with 'size' number of bytes of block, meaning it will take 'size' bytes
+   until a new allocation happens, since an allocation of 'size' is performed, although the
+   arena will grow dynamically with new blocks of 'size' bytes each growth. */
+LIGHT_ARENA_API Light_Arena* 
 arena_create(size_t size) {
-    Light_Arena* res = (Light_Arena*)calloc(1, size + sizeof(Light_Arena));
-    res->capacity = size;
-    res->ptr = (void*)(res + 1);
-    res->next = 0;
-    return res;
+    Light_Arena* base = (Light_Arena*)calloc(1, size + sizeof(Light_Arena));
+	base->capacity = size;
+	base->ptr = (void*)(base + 1);
+	base->last = base;
+	base->next = 0;
+    return base;
 }
 
-void*
+/* allocates memory in the arena and may cause a growth in the size of it. Allocation works
+   just like 'calloc', meaning the memory will be zeroed. */
+LIGHT_ARENA_API void*
 arena_alloc(Light_Arena* arena, size_t size_bytes) {
+#define arena_size(A) ((char*)((A)->ptr) - (char*)(A) + sizeof(Light_Arena))
     void* result;
-    if (size_bytes + arena_size(arena) > arena_capacity(arena)) {
-        Light_Arena* narena = arena_create(arena_capacity(arena));
-        arena->next = narena;
+    if (size_bytes + arena_size(arena->last) > arena->last->capacity) {
+        Light_Arena* narena = arena_create(arena->capacity);
+        arena->last->next = narena;
+        arena->last->next = narena;
+        arena->last = narena;
+		arena->ptr = narena->ptr;
+		result = narena->ptr;
     } else {
-        result = arena->ptr;
-        arena->ptr = (char*)arena->ptr + size_bytes;
+        result = arena->last->ptr;
+        arena->last->ptr = (char*)arena->last->ptr + size_bytes;
     }
+#undef arena_size
     return result;
 }
 
-static void
+/* frees all arena content making its pointer invalid. */
+LIGHT_ARENA_API void
 arena_free(Light_Arena* arena) {
-    if(!arena) return;
-    arena_free(arena->next);
-    free(arena);
+	Light_Arena* aux = arena;
+	while (aux) {
+		Light_Arena* next = aux->next;
+		free(aux);
+		aux = next;
+	}
 }
 
-//#define arena_clear(A) arena_ptr(A) = (void*)((Arena_Base*)(arena_base(A)) + 1)
-
-#endif
+#endif /* H_LIGHT_ARENA */
