@@ -42,15 +42,7 @@
 #include <stdlib.h>
 #endif
 
-#if defined(LIGHT_ARENA_EXPORT)
-#ifdef __cplusplus
-#define LIGHT_ARENA_API extern "C"
-#else
 #define LIGHT_ARENA_API extern
-#endif
-#else
-#define LIGHT_ARENA_API static
-#endif
 
 typedef struct Light_Arena_t{
     size_t capacity;
@@ -59,6 +51,12 @@ typedef struct Light_Arena_t{
     struct Light_Arena_t* last;
 } Light_Arena;
 
+LIGHT_ARENA_API Light_Arena* arena_create(size_t size);
+LIGHT_ARENA_API void* arena_alloc(Light_Arena* arena, size_t size_bytes);
+LIGHT_ARENA_API void  arena_free(Light_Arena* arena);
+LIGHT_ARENA_API void  arena_clear(Light_Arena* arena);
+
+#if defined(LIGHT_ARENA_IMPLEMENT)
 /* creates an arena with 'size' number of bytes of block, meaning it will take 'size' bytes
    until a new allocation happens, since an allocation of 'size' is performed, although the
    arena will grow dynamically with new blocks of 'size' bytes each growth. */
@@ -101,4 +99,16 @@ arena_free(Light_Arena* arena) {
 	}
 }
 
+/* clears all the memory in the arena, not freeing it */
+LIGHT_ARENA_API void
+arena_clear(Light_Arena* arena) {
+	Light_Arena* aux = arena;
+	while (aux) {
+		Light_Arena* next = aux->next;
+        aux->ptr = aux + 1;
+		aux = next;
+	}
+}
+
 #endif /* H_LIGHT_ARENA */
+#endif
