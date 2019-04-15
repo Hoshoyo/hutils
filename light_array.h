@@ -97,6 +97,10 @@ static void* array_dyn_allocate(size_t size) {
     array_capacity(A) = array_capacity(A) * 2 : 0, \
     (A)[array_length(A)++] = (V))
 
+#define array_allocate(A, V) ((array_length(A) + (V) >= array_capacity(A)) \
+    ? *((void**)&(A)) = (void*)((Dynamic_ArrayBase*)realloc((Dynamic_ArrayBase*)(A) - 1, sizeof(Dynamic_ArrayBase) + sizeof(*(A)) * (array_length(A) + (V))) + 1), \
+    array_capacity(A) = (array_length(A) + (V)) : 0)
+
 /* inserts into a given array A the value V (rvalue of type of the array) in the index I and pushes every value after
    the index forward in the array. */
 #define array_insert(A, V, I) array_push(A, V), memmove((A) + (I) + 1, (A) + (I), sizeof(*A) * (array_length(A) - (I) - 1)), (A)[I] = (V)
