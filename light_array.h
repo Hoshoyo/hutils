@@ -86,7 +86,13 @@ static void* array_dyn_allocate(size_t size) {
     ((Dynamic_ArrayBase*)res)->capacity = 1;
     return (void*)((char*)res + sizeof(Dynamic_ArrayBase));
 }
+static void* array_dyn_allocate_capacity(size_t size_element, size_t capacity) {
+    void* res = calloc(1, size_element * capacity + sizeof(Dynamic_ArrayBase));
+    ((Dynamic_ArrayBase*)res)->capacity = capacity;
+    return (void*)((char*)res + sizeof(Dynamic_ArrayBase));
+}
 #define array_new(T) array_dyn_allocate(sizeof(T) + sizeof(Dynamic_ArrayBase))
+#define array_new_len(T, L) array_dyn_allocate_capacity(sizeof(T), L)
 #endif
 
 /* given an array created by array_new and a value (rvalue) of the base type of the array, puts that value in the last
