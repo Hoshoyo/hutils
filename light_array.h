@@ -15,7 +15,7 @@
     void* calloc(size_t num, size_t size)
     void* realloc(void* ptr, size_t new_size)
     void  free(void* block)
-    void* memcpy(void* dest, void* src, size_t count)
+    void* memmove(void* dest, void* src, size_t count)
 
     ----------------------------------------------------------------------------------
 
@@ -92,6 +92,7 @@ static void* array_dyn_allocate_capacity(size_t size_element, size_t capacity) {
     return (void*)((char*)res + sizeof(Dynamic_ArrayBase));
 }
 #define array_new(T) array_dyn_allocate(sizeof(T) + sizeof(Dynamic_ArrayBase))
+/* creates a new array of type T with starting capacity L */
 #define array_new_len(T, L) array_dyn_allocate_capacity(sizeof(T), L)
 #endif
 
@@ -103,6 +104,9 @@ static void* array_dyn_allocate_capacity(size_t size_element, size_t capacity) {
     array_capacity(A) = array_capacity(A) * 2 : 0, \
     (A)[array_length(A)++] = (V))
 
+/* given an array created by array_new and an integer value V. Allocates on top of the existing memory V additional
+   bytes of memory, changing the array capacity but not its length.
+ */
 #define array_allocate(A, V) ((array_length(A) + (V) >= array_capacity(A)) \
     ? *((void**)&(A)) = (void*)((Dynamic_ArrayBase*)realloc((Dynamic_ArrayBase*)(A) - 1, sizeof(Dynamic_ArrayBase) + sizeof(*(A)) * (array_length(A) + (V))) + 1), \
     array_capacity(A) = (array_length(A) + (V)) : 0)
