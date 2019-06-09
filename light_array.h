@@ -69,6 +69,11 @@ typedef struct {
 
 #define LIGHT_ARRAY_MIN(x, y) (y ^ ((x ^ y) & -(x < y)))
 #define LIGHT_ARRAY_MAX(x, y) (x ^ ((x ^ y) & -(x < y)))
+#if defined(__GNUC__)
+#define LIGHT_ARRAY_API __attribute__((unused))
+#else
+#define LIGHT_ARRAY_API
+#endif
 
 /* gets the base of the array where the capacity and length info are, not recommended to use (internal of the library). */
 #define array_base(A) ((Dynamic_ArrayBase*)(((char*)(A)) - sizeof(Dynamic_ArrayBase)))
@@ -81,12 +86,12 @@ typedef struct {
 /* creates a new array of type T */
 #define array_new(T) (T*)((char*)&(((Dynamic_ArrayBase*)calloc(1, sizeof(Dynamic_ArrayBase) + sizeof(T)))->capacity = 1) + sizeof(Dynamic_ArrayBase))
 #else
-static void* array_dyn_allocate(size_t size) {
+static void* LIGHT_ARRAY_API array_dyn_allocate(size_t size) {
     void* res = calloc(1, size);
     ((Dynamic_ArrayBase*)res)->capacity = 1;
     return (void*)((char*)res + sizeof(Dynamic_ArrayBase));
 }
-static void* array_dyn_allocate_capacity(size_t size_element, size_t capacity) {
+static void* LIGHT_ARRAY_API array_dyn_allocate_capacity(size_t size_element, size_t capacity) {
     void* res = calloc(1, size_element * capacity + sizeof(Dynamic_ArrayBase));
     ((Dynamic_ArrayBase*)res)->capacity = capacity;
     return (void*)((char*)res + sizeof(Dynamic_ArrayBase));
