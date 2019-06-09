@@ -86,12 +86,12 @@ typedef struct {
 /* creates a new array of type T */
 #define array_new(T) (T*)((char*)&(((Dynamic_ArrayBase*)calloc(1, sizeof(Dynamic_ArrayBase) + sizeof(T)))->capacity = 1) + sizeof(Dynamic_ArrayBase))
 #else
-static void* LIGHT_ARRAY_API array_dyn_allocate(size_t size) {
+static LIGHT_ARRAY_API void* array_dyn_allocate(size_t size) {
     void* res = calloc(1, size);
     ((Dynamic_ArrayBase*)res)->capacity = 1;
     return (void*)((char*)res + sizeof(Dynamic_ArrayBase));
 }
-static void* LIGHT_ARRAY_API array_dyn_allocate_capacity(size_t size_element, size_t capacity) {
+static LIGHT_ARRAY_API void* array_dyn_allocate_capacity(size_t size_element, size_t capacity) {
     void* res = calloc(1, size_element * capacity + sizeof(Dynamic_ArrayBase));
     ((Dynamic_ArrayBase*)res)->capacity = capacity;
     return (void*)((char*)res + sizeof(Dynamic_ArrayBase));
