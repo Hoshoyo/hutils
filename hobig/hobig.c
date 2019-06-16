@@ -5,6 +5,7 @@ typedef long long int s64;
 #define true 1
 #define false 0
 
+#include <assert.h>
 #include "../light_array.h"
 #include "table.h"
 
@@ -138,8 +139,92 @@ multiply_by_pow2(HoBigInt* n, int power) {
     }
 }
 
+// Compares two numbers considering sign
+// Return value:
+//  1 -> left is bigger
+//  0 -> they are equal
+// -1 -> right is bigger
+int
+hobig_int_compare_signed(HoBigInt* left, HoBigInt* right) {
+    // Check the sign first
+    if(left->negative != right->negative) {
+        if(left->negative) return -1;
+        return 1;
+    }
+
+    // If both are negative, the biggest absolute will be
+    // the lower value.
+    int negative = (left->negative && right->negative) ? -1 : 1;
+
+    size_t llen = array_length(left->value);
+    size_t rlen = array_length(right->value);
+
+    if(llen > rlen) return 1 * negative;
+    if(llen < rlen) return -1 * negative;
+
+    for(int i = llen - 1;; --i) {
+        if(left->value[i] > right->value[i]) {
+            return 1 * negative;
+        } else if (left->value[i] < right->value[i]) {
+            return -1 * negative;
+        }
+        if(i == 0) break;
+    }
+
+    return 0;
+}
+
+// Compares the absolute value of two numbers, ignoring the sign
+// Return value:
+//  1 -> left is bigger
+//  0 -> they are equal
+// -1 -> right is bigger
+int
+hobig_int_compare_absolute(HoBigInt* left, HoBigInt* right) {
+    if(left->value == right->value)
+        return 0;
+
+    size_t llen = array_length(left->value);
+    size_t rlen = array_length(right->value);
+
+    if(llen > rlen) return 1;
+    if(llen < rlen) return -1;
+
+
+    for(int i = llen - 1;; --i) {
+        if(left->value[i] > right->value[i]) {
+            return 1;
+        } else if (left->value[i] < right->value[i]) {
+            return -1;
+        }
+        if(i == 0) break;
+    }
+
+    return 0;
+}
+
+void
+hobig_int_sub(HoBigInt* dst, HoBigInt* src);
+
 void 
 hobig_int_sum(HoBigInt* dst, HoBigInt* src) {
+    // Check to see if a subtraction is preferred
+    if(dst->negative != src->negative) {
+        // Subtract instead
+        if(dst->negative) {
+            // -x + y => -x -(-y)
+            src->negative = 1;
+            hobig_int_sub(dst, src);
+            src->negative = 0;
+        } else {
+            // x + (-y) => x - y
+            src->negative = 0;
+            hobig_int_sub(dst, src);
+            src->negative = 1;
+        }
+        return;
+    }
+
     HoBigInt s = {0};
     int free_source = 0;
     if(dst == src) {
@@ -182,6 +267,68 @@ hobig_int_sum(HoBigInt* dst, HoBigInt* src) {
 
     if(free_source) {
         hobig_free(*src);
+    }
+}
+
+void
+hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
+    int comparison = hobig_int_compare_absolute(dst, src);
+
+    int dst_sign = dst->negative;
+    int src_sign = src->negative;
+
+    if(dst->negative != src->negative) {
+        assert(comparison != 0);
+        // if different sign and dst > src perform an absolute sum
+        dst->negative = 0;
+        src->negative = 0;
+        
+        hobig_int_sum(dst, src);
+        // final sign is going to be the destination sign, since its absolute
+        // value is bigger.
+        dst->negative = dst_sign;
+
+        // restore src
+        src->negative = src_sign;
+        return;
+    }
+
+    switch(comparison) {
+        case 0: {
+            // Result is 0
+            dst->negative = 0;
+            *dst->value = 0;
+            array_length(dst->value) = 1;
+        } break;
+        case 1: {
+            // dst > src
+            u64 borrow = 0;
+            for(int i = 0; i < array_length(src->value); ++i) {
+                u64 start = dst->value[i];
+                dst->value[i] -= borrow;
+                dst->value[i] -= (src->value[i]);
+                if(dst->value[i] > start) {
+                    borrow = 1;
+                } else {
+                    borrow = 0;
+                }
+            }
+        } break;
+        case -1: {
+            // dst < src
+            dst->negative = (dst->negative) ? 0 : 1;
+            u64 borrow = 0;
+            for(int i = 0; i < array_length(src->value); ++i) {
+                u64 start = src->value[i];
+                dst->value[i] = src->value[i] - borrow - dst->value[i];
+                if(dst->value[i] > start) {
+                    borrow = 1;
+                } else {
+                    borrow = 0;
+                }
+            }
+        } break;
+        default: assert(0); break;
     }
 }
 
@@ -237,87 +384,6 @@ hobig_int_mul(HoBigInt* dst, HoBigInt* src) {
     }
 }
 
-// Compares two numbers considering sign
-// Return value:
-//  1 -> left is bigger
-//  0 -> they are equal
-// -1 -> right is bigger
-int
-hobig_int_compare_signed(HoBigInt* left, HoBigInt* right) {
-    // Check the sign first
-    if(left->negative != right->negative) {
-        if(left->negative) return -1;
-        return 1;
-    }
-
-    // If both are negative, the biggest absolute will be
-    // the lower value.
-    int negative = (left->negative && right->negative) ? -1 : 1;
-
-    size_t llen = array_length(left->value);
-    size_t rlen = array_length(right->value);
-
-    if(llen > rlen) return 1 * negative;
-    if(llen < rlen) return -1 * negative;
-
-    for(int i = llen - 1;; --i) {
-        if(left->value[i] > right->value[i]) {
-            return 1 * negative;
-        } else if (left->value[i] < right->value[i]) {
-            return -1 * negative;
-        }
-        if(i == 0) break;
-    }
-
-    return 0;
-}
-
-// Compares the absolute value of two numbers, ignoring the sign
-// Return value:
-//  1 -> left is bigger
-//  0 -> they are equal
-// -1 -> right is bigger
-int
-hobig_int_compare_absolute(HoBigInt* left, HoBigInt* right) {
-    size_t llen = array_length(left->value);
-    size_t rlen = array_length(right->value);
-
-    if(llen > rlen) return 1;
-    if(llen < rlen) return -1;
-
-    for(int i = llen - 1;; --i) {
-        if(left->value[i] > right->value[i]) {
-            return 1;
-        } else if (left->value[i] < right->value[i]) {
-            return -1;
-        }
-        if(i == 0) break;
-    }
-
-    return 0;
-}
-
-void
-hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
-    int comparison = hobig_int_compare_absolute(dst, src);
-
-    if(comparison == 1) {
-        // dst > src
-        u64 borrow = 0;
-        for(int i = 0; i < array_length(src->value); ++i) {
-            u64 start = dst->value[i];
-            dst->value[i] -= borrow;
-            dst->value[i] -= (src->value[i]);
-            if(dst->value[i] > start) {
-                // borrow
-                borrow = 1;
-            } else {
-                borrow = 0;
-            }
-        }
-    }
-}
-
 HoBigInt 
 hobig_new_dec(const char* number, unsigned int* error) {
     HoBigInt result = {0};
@@ -329,9 +395,10 @@ hobig_new_dec(const char* number, unsigned int* error) {
         return result;
     }
 
+    int sign = 0;
     int index = 0;
     if(number[index] == '-') {
-        result.negative = 1;
+        sign = 1;
         index++;
     }
 
@@ -393,6 +460,8 @@ hobig_new_dec(const char* number, unsigned int* error) {
     if(error && *error) {
         hobig_free(result);
     }
+
+    result.negative = sign; // do it only now, to leave the sums positive
 
     return result;
 }
