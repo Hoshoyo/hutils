@@ -150,7 +150,9 @@ hobig_int_sum(HoBigInt* dst, HoBigInt* src) {
 
     // destination is at least the size of src or bigger
     if(array_length(dst->value) < array_length(src->value)) {
-        array_allocate(dst->value, array_length(src->value) - array_length(dst->value));
+        size_t count = array_length(src->value) - array_length(dst->value);
+        array_allocate(dst->value, count);
+        memset(dst->value + array_length(dst->value), 0, count * sizeof(*dst->value));
         array_length(dst->value) = array_length(src->value);
     }
     u64 carry = 0;
@@ -297,7 +299,23 @@ hobig_int_compare_absolute(HoBigInt* left, HoBigInt* right) {
 
 void
 hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
-    
+    int comparison = hobig_int_compare_absolute(dst, src);
+
+    if(comparison == 1) {
+        // dst > src
+        u64 borrow = 0;
+        for(int i = 0; i < array_length(src->value); ++i) {
+            u64 start = dst->value[i];
+            dst->value[i] -= borrow;
+            dst->value[i] -= (src->value[i]);
+            if(dst->value[i] > start) {
+                // borrow
+                borrow = 1;
+            } else {
+                borrow = 0;
+            }
+        }
+    }
 }
 
 HoBigInt 
@@ -354,6 +372,7 @@ hobig_new_dec(const char* number, unsigned int* error) {
 
         // Grab a copy to be used to multiply by the digit value
         HoBigInt pow10val = hobig_int_copy(powers_of_ten);
+
         // Multiply by the digit value n
         hobig_int_mul(&pow10val, &digits[n]);
 
