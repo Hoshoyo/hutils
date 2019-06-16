@@ -210,7 +210,7 @@ void
 hobig_int_sub(HoBigInt* dst, HoBigInt* src);
 
 void 
-hobig_int_sum(HoBigInt* dst, HoBigInt* src) {
+hobig_int_add(HoBigInt* dst, HoBigInt* src) {
     // Check to see if a subtraction is preferred
     if(dst->negative != src->negative) {
         // Subtract instead
@@ -263,7 +263,7 @@ hobig_int_sum(HoBigInt* dst, HoBigInt* src) {
                 dst->value[array_length(src->value)] += 1;
             } else {
                 HoBigInt big_one = hobig_int_new(1);
-                hobig_int_sum(dst, &big_one);
+                hobig_int_add(dst, &big_one);
             }
         }
     }
@@ -286,7 +286,7 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
         dst->negative = 0;
         src->negative = 0;
         
-        hobig_int_sum(dst, src);
+        hobig_int_add(dst, src);
         // final sign is going to be the destination sign, since its absolute
         // value is bigger.
         dst->negative = dst_sign;
@@ -316,6 +316,9 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
                     borrow = 0;
                 }
             }
+            if(borrow) {
+                dst->value[array_length(src->value)] -= 1;
+            }
         } break;
         case -1: {
             // dst < src
@@ -330,6 +333,7 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
                     borrow = 0;
                 }
             }
+            assert(borrow == 0);
         } break;
         default: assert(0); break;
     }
@@ -358,7 +362,7 @@ hobig_int_mul_pow10(HoBigInt* start, int p) {
         multiply_by_pow2(start, 3);     // multiply by 8
         multiply_by_pow2(&copy2, 1);    // multiply by 2
 
-        hobig_int_sum(start, &copy2);   // sum the result
+        hobig_int_add(start, &copy2);   // sum the result
 
         array_free(copy2.value);        // free temporary
     }
@@ -387,7 +391,7 @@ hobig_int_mul(HoBigInt* dst, HoBigInt* src) {
         for(int i = 0; i < word_size; ++i) {
             int bit = (v >> i) & 1;
             if(bit) {
-                hobig_int_sum(dst, &dst_copy);
+                hobig_int_add(dst, &dst_copy);
             }
             multiply_by_pow2(&dst_copy, 1);
         }
@@ -459,7 +463,7 @@ hobig_new_dec(const char* number, unsigned int* error) {
         hobig_int_mul(&pow10val, &digits[n]);
 
         // Sum it back to the final result
-        hobig_int_sum(&result, &pow10val);
+        hobig_int_add(&result, &pow10val);
 
         // Free temporary
         hobig_free(pow10val);
@@ -481,7 +485,68 @@ hobig_new_dec(const char* number, unsigned int* error) {
     return result;
 }
 
-void
-hobig_int_div(HoBigInt* dst, HoBigInt* src) {
+typedef struct {
+    HoBigInt quotient;
+    HoBigInt remainder;
+} HoBigInt_DivResult;
 
+HoBigInt_DivResult
+hobig_int_div(HoBigInt* dividend, HoBigInt* divisor) {
+    HoBigInt_DivResult result = { 0 };
+
+    if(*divisor->value == 0) {
+        // Division by 0
+        assert(0);
+    }
+
+    int comparison = hobig_int_compare_absolute(dividend, divisor);
+
+    if(comparison == -1) {
+        // Dividend is smaller than divisor, quotient = 0 and remainder = dividend
+        result.quotient = hobig_int_new(0);
+        result.remainder = hobig_int_copy(*dividend);
+    } else if(comparison == 0) {
+        // Both numbers are equal, quotient is 1 and remainder is 0
+        result.quotient = hobig_int_new(1);
+        result.remainder = hobig_int_new(0);
+    } else {
+        // Perform long division since dividend > divisor
+        // 100101010 | 111101
+        HoBigInt remainder = hobig_int_new(0);
+        HoBigInt quotient = hobig_int_new(0);
+        HoBigInt one = hobig_int_new(1);
+
+        for(int k = array_length(dividend->value) - 1 ;; --k) {
+            u64 v = dividend->value[k];
+            for(int i = sizeof(*dividend->value) * 8 - 1; i >= 0; --i) {
+                multiply_by_pow2(&quotient, 1);
+                multiply_by_pow2(&remainder, 1);
+                int bit = (v >> i) & 1;
+                if(bit) {
+                    hobig_int_add(&remainder, &one);
+                }
+                int comparison = hobig_int_compare_absolute(&remainder, divisor);
+                if(comparison == 1) {
+                    // Ready to divide, quotient receives one
+                    // and divisor is subtracted from remainder 
+                    hobig_int_add(&quotient, &one);
+                    hobig_int_sub(&remainder, divisor);
+                } else if(comparison == 0) {
+                    // Division is 1 and remainder 0
+                    *remainder.value = 0;
+                    array_length(remainder.value) = 1;
+                    hobig_int_add(&quotient, &one);
+                } else {
+                    // Still not ready to divide
+                    // Put a zero in the quotient
+                }
+            }
+            if(k == 0) break;
+        }
+        result.quotient = quotient;
+        result.remainder = remainder;
+        hobig_free(one);
+    }
+
+    return result;
 }
