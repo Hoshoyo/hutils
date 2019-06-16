@@ -5,7 +5,7 @@ typedef long long int s64;
 #define true 1
 #define false 0
 
-#include "light_array.h"
+#include "../light_array.h"
 #include "table.h"
 
 #define printf(...) printf(__VA_ARGS__); fflush(stdout)

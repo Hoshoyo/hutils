@@ -136,4 +136,9 @@ static LIGHT_ARRAY_API void* array_dyn_allocate_capacity(size_t size_element, si
 /* removes the last value of the array in an unordered way, putting the last element in its place. */
 #define array_remove(A, Index) (array_length(A)--, (A)[Index] = (A)[array_length(A)])
 
+/* copies an array to a new one, its capacity and length are also preserved */
+#define array_copy(A) ((void*)((Dynamic_ArrayBase*) \
+    memmove((Dynamic_ArrayBase*)array_dyn_allocate_capacity(sizeof(*A), array_capacity(A)) - 1, \
+    array_base(A), sizeof(Dynamic_ArrayBase) + array_length(A) * sizeof(*A)) + 1))
+
 #endif /* H_LIGHT_ARRAY */
