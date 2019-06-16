@@ -183,19 +183,6 @@ hobig_int_sum(HoBigInt* dst, HoBigInt* src) {
     }
 }
 
-static void 
-print_array(u64* a) {
-    printf("length:   %lu\n", array_length(a));
-    printf("capacity: %lu\n", array_capacity(a));
-    printf("data:     %p", a);
-    printf("{ ");
-    for(size_t i = 0; i < array_length(a); ++i) {
-        if(i != 0) printf(", ");
-        printf("%lld", a[i]);
-    }
-    printf(" }\n");
-}
-
 void 
 hobig_int_mul_pow10(HoBigInt* start, int p) {
     if(p == 0) {
@@ -246,6 +233,71 @@ hobig_int_mul(HoBigInt* dst, HoBigInt* src) {
     if(free_source) {
         hobig_free(*src);
     }
+}
+
+// Compares two numbers considering sign
+// Return value:
+//  1 -> left is bigger
+//  0 -> they are equal
+// -1 -> right is bigger
+int
+hobig_int_compare_signed(HoBigInt* left, HoBigInt* right) {
+    // Check the sign first
+    if(left->negative != right->negative) {
+        if(left->negative) return -1;
+        return 1;
+    }
+
+    // If both are negative, the biggest absolute will be
+    // the lower value.
+    int negative = (left->negative && right->negative) ? -1 : 1;
+
+    size_t llen = array_length(left->value);
+    size_t rlen = array_length(right->value);
+
+    if(llen > rlen) return 1 * negative;
+    if(llen < rlen) return -1 * negative;
+
+    for(int i = llen - 1;; --i) {
+        if(left->value[i] > right->value[i]) {
+            return 1 * negative;
+        } else if (left->value[i] < right->value[i]) {
+            return -1 * negative;
+        }
+        if(i == 0) break;
+    }
+
+    return 0;
+}
+
+// Compares the absolute value of two numbers, ignoring the sign
+// Return value:
+//  1 -> left is bigger
+//  0 -> they are equal
+// -1 -> right is bigger
+int
+hobig_int_compare_absolute(HoBigInt* left, HoBigInt* right) {
+    size_t llen = array_length(left->value);
+    size_t rlen = array_length(right->value);
+
+    if(llen > rlen) return 1;
+    if(llen < rlen) return -1;
+
+    for(int i = llen - 1;; --i) {
+        if(left->value[i] > right->value[i]) {
+            return 1;
+        } else if (left->value[i] < right->value[i]) {
+            return -1;
+        }
+        if(i == 0) break;
+    }
+
+    return 0;
+}
+
+void
+hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
+    
 }
 
 HoBigInt 
