@@ -86,6 +86,9 @@ hobig_int_print(HoBigInt n) {
     }
 
     print_number(result, length);
+
+    free(result);
+    free(buffer);
 }
 
 static void 
@@ -330,6 +333,17 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
         } break;
         default: assert(0); break;
     }
+    // Reduce the array size of destination if it is the case
+    size_t dst_length = array_length(dst->value);
+    size_t reduction = 0;
+    for(size_t i = dst_length - 1;;--i) {
+        if(dst->value[i] == 0)
+            reduction++;
+        else
+            break;
+        if(i == 0) break;
+    }
+    array_length(dst->value) -= reduction;
 }
 
 void 
@@ -378,6 +392,7 @@ hobig_int_mul(HoBigInt* dst, HoBigInt* src) {
             multiply_by_pow2(&dst_copy, 1);
         }
     }
+    hobig_free(dst_copy);
 
     if(free_source) {
         hobig_free(*src);
@@ -464,4 +479,9 @@ hobig_new_dec(const char* number, unsigned int* error) {
     result.negative = sign; // do it only now, to leave the sums positive
 
     return result;
+}
+
+void
+hobig_int_div(HoBigInt* dst, HoBigInt* src) {
+
 }
