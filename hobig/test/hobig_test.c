@@ -2,34 +2,30 @@
 #include "../hobig.c"
 
 
-int main() {
-    #if 0
-    unsigned int error = 0;
-    HoBigInt n1 = hobig_new_dec("1787687534840581043851512481241209348120984", 0);
-    HoBigInt n2 = hobig_new_dec("504139859013457891357189758912742131231131", &error);
+void test_hobig_mod_div() {
+    // Result = 1
+    // HoBigInt n   = hobig_int_new(5);
+    // HoBigInt pow = hobig_int_new(117);
+    // HoBigInt mod = hobig_int_new(19);
 
-    hobig_int_mul(&n1, &n2);
+    HoBigInt n   = hobig_new_dec("8197459871094878951798740923874981", 0);
+    HoBigInt pow = hobig_new_dec("4198783950798472098372176371283", 0);
+    HoBigInt mod = hobig_new_dec("23098419208371261834769749217491", 0);
 
-    hobig_int_print(n1);
+    HoBigInt r = hobig_int_mod_div(&n, &pow, &mod);
 
-    hobig_free(n1);
-    hobig_free(n2);
-    #endif
-
-    HoBigInt a = hobig_new_dec("789219851475734513498857134758719438", 0);
-    HoBigInt b = hobig_new_dec("17801401298091820983", 0);
-    //HoBigInt a = hobig_new_dec("21905251264990169654", 0);
-    //HoBigInt b = hobig_new_dec("17801401298091820983", 0);
-
-    //hobig_int_sub(&a, &b);
-
-    //hobig_int_print(a);
-
-    HoBigInt_DivResult r = hobig_int_div(&a, &b);
-    hobig_int_print(r.quotient);
-    printf(", ");
-    hobig_int_print(r.remainder);
+    hobig_int_print(r);
     printf("\n");
+
+    hobig_free(n);
+    hobig_free(pow);
+    hobig_free(mod);
+    hobig_free(r);
+
+}
+
+int main() {
+    test_hobig_mod_div();
 
     return 0;
 }

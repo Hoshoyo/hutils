@@ -5,6 +5,7 @@ typedef long long int s64;
 #define true 1
 #define false 0
 
+#include <stdarg.h>
 #include <assert.h>
 #include "../light_array.h"
 #include "table.h"
@@ -549,4 +550,37 @@ hobig_int_div(HoBigInt* dividend, HoBigInt* divisor) {
     }
 
     return result;
+}
+
+HoBigInt
+hobig_int_mod_div(HoBigInt* n, HoBigInt* exp, HoBigInt* mod) {
+    HoBigInt final = hobig_int_new(1);
+
+    HoBigInt_DivResult powers = hobig_int_div(n, mod);
+
+    for(int k = 0; k < array_length(exp->value); ++k) {
+        u64 v = exp->value[k];
+        for(int i = 0; i < sizeof(*exp->value) * 8; ++i) {
+            int bit = (v >> i) & 1;
+
+            if(bit) {
+                // Sum to the final mod
+                hobig_int_mul(&final, &powers.remainder);
+            }
+            hobig_int_mul(&powers.remainder, &powers.remainder);
+            HoBigInt_DivResult ps = hobig_int_div(&powers.remainder, mod);
+
+            hobig_free(powers.quotient);
+            hobig_free(powers.remainder);
+            powers = ps;
+        }
+    }
+    hobig_free(powers.quotient);
+    hobig_free(powers.remainder);
+
+    HoBigInt_DivResult result = hobig_int_div(&final, mod);
+    hobig_free(result.quotient);
+    hobig_free(final);
+
+    return result.remainder;
 }
