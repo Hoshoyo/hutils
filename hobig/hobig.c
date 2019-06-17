@@ -32,7 +32,7 @@ typedef enum {
 } TimeSlot;
 static double elapsed_times[64];
 
-#define COLLECT_TIMES 1
+#define COLLECT_TIMES 0
 
 #if COLLECT_TIMES
 #define TIME_COUNT() double time_count_start = os_time_us()
@@ -662,6 +662,87 @@ hobig_int_mod_div(HoBigInt* n, HoBigInt* exp, HoBigInt* m) {
 HoBigInt
 hobig_int_gcd(HoBigInt* a, HoBigInt* b) {
     if(array_length(a->value) == 1 && *a->value == 0) {
-        
+        return hobig_int_copy(*b);
     }
+    if(array_length(b->value) == 1 && *b->value == 0) {
+        return hobig_int_copy(*a);
+    }
+    HoBigInt_DivResult d = hobig_int_div(a, b);
+    return hobig_int_gcd(b, &d.remainder);
+}
+
+int
+hobig_int_bitcount(HoBigInt* v) {
+    return (int)(array_length(v->value) * sizeof(*v->value) * 8);
+}
+
+// Compares if a is one less than b
+static int
+compare_if_one_less(HoBigInt* a, HoBigInt* b) {
+    if(a->value[0] != b->value[0] - 1) {
+        return 0;
+    }
+
+    if(array_length(a->value) != array_length(b->value))
+        return 0;
+
+    // Rest must be equal
+    for(int i = 1; i < array_length(a->value); ++i) {
+        if(a->value[i] != b->value[i])
+            return 0;
+    }
+    return 1;
+}
+
+int
+miller_rabin_probably_prime(HoBigInt* n) {
+    if(!(n->value[0] & 1)) {
+        return 0;
+    }
+    HoBigInt one = hobig_int_new(1);
+    HoBigInt two = hobig_int_new(2);
+    HoBigInt original = hobig_int_copy(*n);
+
+    hobig_int_sub(n, &one);
+    HoBigInt remainder = *n;
+
+    int power = 0;
+    while(!(n->value[0] & 1)) {
+        // TODO(psv): optimize division by 2
+        HoBigInt_DivResult res = hobig_int_div(n, &two);
+        remainder = res.remainder;
+        *n = res.quotient;
+        power++;
+    }
+
+    // Calculate b0 => a^n mod original
+    // a is chosen to be 2
+    HoBigInt b = hobig_int_mod_div(&two, n, &original);
+
+    // First test equal to 1
+    if(hobig_int_compare_absolute(&b, &one) == 0) {
+        return 1;
+    }
+
+    // Second test equal to -1
+    if(compare_if_one_less(&b, &original)) {
+        return 1;
+    }
+
+    // First test failed, we need to continue
+
+    // Try again squared
+    HoBigInt next_b = hobig_int_mod_div(&b, &two, &original);
+    //  1 now says it is composite 100%
+    // -1 now says prime probably
+
+    if(hobig_int_compare_absolute(&next_b, &one) == 0) {
+        return 0;
+    }
+
+    if(compare_if_one_less(&next_b, &original)) {
+        return 1;
+    }
+
+    return 0;
 }
