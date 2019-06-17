@@ -58,14 +58,9 @@ typedef struct {
 } HoBigInt;
 
 HoBigInt 
-hobig_int_new(s64 v) {
+hobig_int_new(u64 v) {
     HoBigInt result = { 0, array_new(u64) };
-    if(v < 0) {
-        result.negative = 1;
-        array_push(result.value, -v);
-    } else {
-        array_push(result.value, v);
-    }
+    array_push(result.value, v);
     return result;
 }
 
@@ -694,55 +689,161 @@ compare_if_one_less(HoBigInt* a, HoBigInt* b) {
     return 1;
 }
 
-int
-miller_rabin_probably_prime(HoBigInt* n) {
-    if(!(n->value[0] & 1)) {
-        return 0;
+extern u64 random_integer(u64 min, u64 max);
+extern u64 random_64bit_integer();
+
+HoBigInt
+hobig_random(HoBigInt* max) {
+    HoBigInt r = hobig_int_copy(*max);
+    u64 m = r.value[array_length(r.value) - 1];
+    u64 r0 = random_integer(0, m);
+    r.value[array_length(r.value) - 1] = r0;
+
+    for(int i = 0; i < array_length(r.value) - 1; ++i) {
+        r.value[0] = random_64bit_integer();
     }
+
+    assert(hobig_int_compare_absolute(max, &r) == 1);
+    return r;
+}
+
+// Receives n-1 (even number)
+static HoBigInt
+miller_rabin_pre(HoBigInt* n, int* out_power) {
     HoBigInt one = hobig_int_new(1);
     HoBigInt two = hobig_int_new(2);
-    HoBigInt original = hobig_int_copy(*n);
-
-    hobig_int_sub(n, &one);
-    HoBigInt remainder = *n;
-
+    HoBigInt copy = hobig_int_copy(*n);
     int power = 0;
-    while(!(n->value[0] & 1)) {
+
+    while(!(copy.value[0] & 1)) {
         // TODO(psv): optimize division by 2
-        HoBigInt_DivResult res = hobig_int_div(n, &two);
-        remainder = res.remainder;
-        *n = res.quotient;
+        HoBigInt_DivResult res = hobig_int_div(&copy, &two);
+        hobig_free(copy);
+        hobig_free(res.remainder);
+        copy = res.quotient;
         power++;
     }
 
-    // Calculate b0 => a^n mod original
-    // a is chosen to be 2
-    HoBigInt b = hobig_int_mod_div(&two, n, &original);
+    hobig_free(one);
+    hobig_free(two);
 
-    // First test equal to 1
-    if(hobig_int_compare_absolute(&b, &one) == 0) {
-        return 1;
+    *out_power = power;
+    return copy;
+}
+
+// Must be odd number
+int
+miller_rabin_probably_prime(HoBigInt* in, int k) {
+    HoBigInt one = hobig_int_new(1);
+    HoBigInt two = hobig_int_new(2);
+    HoBigInt original = hobig_int_copy(*in);
+
+    // calculate n-1
+    HoBigInt n_minus_one = hobig_int_copy(*in);
+    hobig_int_sub(&n_minus_one, &one);
+
+    int power = 0;
+    HoBigInt d = miller_rabin_pre(&n_minus_one, &power);
+
+    for(int i = 0; i < k; ++i) {
+        // 1 < a < n - 1  (1 < a < 52 where n = 53)
+        HoBigInt a = hobig_random(&n_minus_one);
+        
+        // Calculate b0 => a^m mod n
+        hobig_int_print(a);
+        printf(" ^ \n");
+        hobig_int_print(d);
+        printf(" = \n");
+        hobig_int_print(original);
+        printf("\n");
+        HoBigInt x = hobig_int_mod_div(&a, &d, &original);
+
+        // First test equal to 1
+        if( hobig_int_compare_absolute(&x, &one) == 0 ||
+            compare_if_one_less(&x, &original)) {
+            continue;
+        }
+
+        int cont = 0;
+        for(int r = 0; r < power; ++r) {
+            x = hobig_int_mod_div(&x, &two, &original);
+            if(compare_if_one_less(&x, &original)) {
+                cont = true;
+                break;
+            }
+        }
+        if(!cont) return 0;
     }
 
-    // Second test equal to -1
-    if(compare_if_one_less(&b, &original)) {
-        return 1;
-    }
+    return 1;
+}
 
-    // First test failed, we need to continue
-
-    // Try again squared
-    HoBigInt next_b = hobig_int_mod_div(&b, &two, &original);
-    //  1 now says it is composite 100%
-    // -1 now says prime probably
-
-    if(hobig_int_compare_absolute(&next_b, &one) == 0) {
+int 
+hobig_is_prime(HoBigInt* n, int k) {
+    // if it is an even number
+    if(!(n->value[0] & 1)) {
         return 0;
     }
 
-    if(compare_if_one_less(&next_b, &original)) {
-        return 1;
+    // Check trivial primes
+    if(array_length(n->value) == 1) {
+        if(*n->value < 2) return 0;
+        if(*n->value == 2 || *n->value == 3 || *n->value == 5) return 1;
     }
 
-    return 0;
+    return miller_rabin_probably_prime(n, k);
+}
+
+HoBigInt
+hobig_random_possible_prime(int bits) {
+    HoBigInt product_small_primes = hobig_int_new(16294579238595022365ull);
+    u64 small_primes[] = { 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53 };
+
+    int chunk_count = bits / (sizeof(u64) * 8);
+
+    //HoBigInt result = {0};
+    //result.value = array_new(u64);
+    //array_allocate(result.value, chunk_count);
+    //array_length(result.value) = chunk_count;
+    HoBigInt result = hobig_new_dec("153392458296071963107880887583555032501439527140411452004720394688774126678888239594531516504934105357899399007158511389363148708316721782992358187218226659777199993925265865934713008875892997645801452594646519896964081799985888922519232167402335382803153639916590399970548572662260486323243767218023829281797", 0);
+
+    int itcount = 0;
+    while(1) {
+        //for(int i = 0; i < chunk_count; ++i) {
+        //    result.value[i] = random_64bit_integer();
+        //}
+        *result.value |= 1; // make sure is odd
+
+        HoBigInt_DivResult d = hobig_int_div(&result, &product_small_primes);
+        u64 mod = *d.remainder.value;
+        hobig_free(d.quotient);
+        hobig_free(d.remainder);
+
+        HoBigInt big_delta = hobig_int_new(0);
+        for (u64 delta = 0; delta < 1<<20; delta += 2) {
+            u64 m = mod + delta;
+            int cont = 0;
+            for (int k = 0; k < sizeof(small_primes) / sizeof(*small_primes); ++k) {
+                if (m % small_primes[k] == 0 && (bits > 6 || m != small_primes[k])) {
+                    cont = 1;
+                    break;
+                }
+            }
+            if(cont) continue;
+
+            if (delta > 0) {
+                *big_delta.value = delta;
+                hobig_int_add(&result, &big_delta);
+            }
+            break;
+        }
+
+        itcount++;
+        if(miller_rabin_probably_prime(&result, 20)) {
+        //if(itcount >= 200) {
+            break;
+        }
+    }
+
+    return result;
 }
