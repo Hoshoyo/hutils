@@ -10,7 +10,47 @@ typedef long long int s64;
 #include "../light_array.h"
 #include "table.h"
 
-#define printf(...) printf(__VA_ARGS__); fflush(stdout)
+#if defined(__linux__)
+#include <time.h>
+double os_time_us() {
+    struct timespec t_spec;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &t_spec);
+    u64 res = t_spec.tv_nsec + 1000000000 * t_spec.tv_sec;
+    return (double)res / 1000.0;
+}
+#else
+#error OS not supported
+#endif
+
+typedef enum {
+    TIME_SLOT_MULTIPLY,
+    TIME_SLOT_DIVIDE,
+    TIME_SLOT_ADD,
+    TIME_SLOT_SUBTRACT,
+    TIME_SLOT_COMPARE,
+    TIME_SLOT_MOD_DIV,
+} TimeSlot;
+static double elapsed_times[64];
+
+#define COLLECT_TIMES 1
+
+#if COLLECT_TIMES
+#define TIME_COUNT() double time_count_start = os_time_us()
+#define TIME_END(X) elapsed_times[X] += os_time_us() - time_count_start
+#else
+#define TIME_COUNT()
+#define TIME_END(X)
+#endif
+
+void
+print_time_slots() {
+    printf("Multiply:  %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_MULTIPLY]);
+    printf("Divide:    %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_DIVIDE]);
+    printf("Add:       %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_ADD]);
+    printf("Subtract:  %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_SUBTRACT]);
+    printf("Compare:   %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_COMPARE]);
+    printf("ModDivide: %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_MOD_DIV]);
+}
 
 typedef struct {
     int  negative;
@@ -150,9 +190,11 @@ multiply_by_pow2(HoBigInt* n, int power) {
 // -1 -> right is bigger
 int
 hobig_int_compare_signed(HoBigInt* left, HoBigInt* right) {
+    TIME_COUNT();
     // Check the sign first
     if(left->negative != right->negative) {
-        if(left->negative) return -1;
+        if(left->negative) { TIME_END(TIME_SLOT_COMPARE); return -1; }
+        TIME_END(TIME_SLOT_COMPARE);
         return 1;
     }
 
@@ -163,18 +205,21 @@ hobig_int_compare_signed(HoBigInt* left, HoBigInt* right) {
     size_t llen = array_length(left->value);
     size_t rlen = array_length(right->value);
 
-    if(llen > rlen) return 1 * negative;
-    if(llen < rlen) return -1 * negative;
+    if(llen > rlen) { TIME_END(TIME_SLOT_COMPARE); return 1 * negative; }
+    if(llen < rlen) { TIME_END(TIME_SLOT_COMPARE); return -1 * negative; }
 
     for(int i = llen - 1;; --i) {
         if(left->value[i] > right->value[i]) {
+            TIME_END(TIME_SLOT_COMPARE);
             return 1 * negative;
         } else if (left->value[i] < right->value[i]) {
+            TIME_END(TIME_SLOT_COMPARE);
             return -1 * negative;
         }
         if(i == 0) break;
     }
-
+    
+    TIME_END(TIME_SLOT_COMPARE);
     return 0;
 }
 
@@ -185,25 +230,31 @@ hobig_int_compare_signed(HoBigInt* left, HoBigInt* right) {
 // -1 -> right is bigger
 int
 hobig_int_compare_absolute(HoBigInt* left, HoBigInt* right) {
-    if(left->value == right->value)
+    TIME_COUNT();
+    if(left->value == right->value) {
+        TIME_END(TIME_SLOT_COMPARE);
         return 0;
+    }
 
     size_t llen = array_length(left->value);
     size_t rlen = array_length(right->value);
 
-    if(llen > rlen) return 1;
-    if(llen < rlen) return -1;
+    if(llen > rlen) { TIME_END(TIME_SLOT_COMPARE); return 1; }
+    if(llen < rlen) { TIME_END(TIME_SLOT_COMPARE); return -1; }
 
 
     for(int i = llen - 1;; --i) {
         if(left->value[i] > right->value[i]) {
+            TIME_END(TIME_SLOT_COMPARE);
             return 1;
         } else if (left->value[i] < right->value[i]) {
+            TIME_END(TIME_SLOT_COMPARE);
             return -1;
         }
         if(i == 0) break;
     }
 
+    TIME_END(TIME_SLOT_COMPARE);
     return 0;
 }
 
@@ -212,6 +263,7 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src);
 
 void 
 hobig_int_add(HoBigInt* dst, HoBigInt* src) {
+    TIME_COUNT();
     // Check to see if a subtraction is preferred
     if(dst->negative != src->negative) {
         // Subtract instead
@@ -226,6 +278,7 @@ hobig_int_add(HoBigInt* dst, HoBigInt* src) {
             hobig_int_sub(dst, src);
             src->negative = 1;
         }
+        TIME_END(TIME_SLOT_ADD);
         return;
     }
 
@@ -272,10 +325,13 @@ hobig_int_add(HoBigInt* dst, HoBigInt* src) {
     if(free_source) {
         hobig_free(*src);
     }
+
+    TIME_END(TIME_SLOT_ADD);
 }
 
 void
 hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
+    TIME_COUNT();
     int comparison = hobig_int_compare_absolute(dst, src);
 
     int dst_sign = dst->negative;
@@ -294,6 +350,7 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
 
         // restore src
         src->negative = src_sign;
+        TIME_END(TIME_SLOT_SUBTRACT);
         return;
     }
 
@@ -349,6 +406,8 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
         if(i == 0) break;
     }
     array_length(dst->value) -= reduction;
+
+    TIME_END(TIME_SLOT_SUBTRACT);
 }
 
 void 
@@ -373,6 +432,7 @@ hobig_int_mul_pow10(HoBigInt* start, int p) {
 // 777 * x => 512 * x + 256 * x + 8 * x + 1 * x
 void 
 hobig_int_mul(HoBigInt* dst, HoBigInt* src) {
+    TIME_COUNT();
     int free_source = 0;
     HoBigInt s = {0};
     if(dst == src) {
@@ -402,6 +462,8 @@ hobig_int_mul(HoBigInt* dst, HoBigInt* src) {
     if(free_source) {
         hobig_free(*src);
     }
+
+    TIME_END(TIME_SLOT_MULTIPLY);
 }
 
 HoBigInt 
@@ -493,6 +555,7 @@ typedef struct {
 
 HoBigInt_DivResult
 hobig_int_div(HoBigInt* dividend, HoBigInt* divisor) {
+    TIME_COUNT();
     HoBigInt_DivResult result = { 0 };
 
     if(*divisor->value == 0) {
@@ -549,26 +612,34 @@ hobig_int_div(HoBigInt* dividend, HoBigInt* divisor) {
         hobig_free(one);
     }
 
+    TIME_END(TIME_SLOT_DIVIDE);
     return result;
 }
 
 HoBigInt
-hobig_int_mod_div(HoBigInt* n, HoBigInt* exp, HoBigInt* mod) {
+hobig_int_mod_div(HoBigInt* n, HoBigInt* exp, HoBigInt* m) {
+    TIME_COUNT();
+    // Holds the final sum of mods of the powers of 2
+    // i.e. 5^117 mod 19
+    // final = (5^1 mod 19) * (5^4 mod 19) * (5^16 mod 19) * (5^32 mod 19) * (5^64 mod 19) = 61200
     HoBigInt final = hobig_int_new(1);
 
-    HoBigInt_DivResult powers = hobig_int_div(n, mod);
+    // Calculate the first modulo n^1 mod m
+    HoBigInt_DivResult powers = hobig_int_div(n, m);
 
+    // For each power of 2 execute
     for(int k = 0; k < array_length(exp->value); ++k) {
         u64 v = exp->value[k];
         for(int i = 0; i < sizeof(*exp->value) * 8; ++i) {
             int bit = (v >> i) & 1;
 
             if(bit) {
-                // Sum to the final mod
+                // Sum the power of 2 result to the final 
+                // result when the bit is set
                 hobig_int_mul(&final, &powers.remainder);
             }
             hobig_int_mul(&powers.remainder, &powers.remainder);
-            HoBigInt_DivResult ps = hobig_int_div(&powers.remainder, mod);
+            HoBigInt_DivResult ps = hobig_int_div(&powers.remainder, m);
 
             hobig_free(powers.quotient);
             hobig_free(powers.remainder);
@@ -578,9 +649,19 @@ hobig_int_mod_div(HoBigInt* n, HoBigInt* exp, HoBigInt* mod) {
     hobig_free(powers.quotient);
     hobig_free(powers.remainder);
 
-    HoBigInt_DivResult result = hobig_int_div(&final, mod);
+    // Calculate the final modulo final mod m (in the example 61200 mod 19)
+    HoBigInt_DivResult result = hobig_int_div(&final, m);
     hobig_free(result.quotient);
     hobig_free(final);
 
+    TIME_END(TIME_SLOT_MOD_DIV);
     return result.remainder;
+}
+
+// Use the euclidean algorithm to calculate GCD(a, b) (Greatest common divisor).
+HoBigInt
+hobig_int_gcd(HoBigInt* a, HoBigInt* b) {
+    if(array_length(a->value) == 1 && *a->value == 0) {
+        
+    }
 }
