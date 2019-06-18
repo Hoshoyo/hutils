@@ -19,7 +19,16 @@ double os_time_us() {
     return (double)res / 1000.0;
 }
 #else
-#error OS not supported
+u64 random_integer(u64 min, u64 max) {
+    return 1;
+}
+u64 random_64bit_integer() {
+    return 1;
+}
+
+double os_time_us() {
+    return 0.0;
+}
 #endif
 
 typedef enum {
@@ -632,6 +641,10 @@ hobig_int_mod_div(HoBigInt* n, HoBigInt* exp, HoBigInt* m) {
                 // Sum the power of 2 result to the final 
                 // result when the bit is set
                 hobig_int_mul(&final, &powers.remainder);
+				HoBigInt_DivResult accumulated = hobig_int_div(&final, m);
+				hobig_free(final);
+				hobig_free(accumulated.quotient);
+				final = accumulated.remainder;
             }
             hobig_int_mul(&powers.remainder, &powers.remainder);
             HoBigInt_DivResult ps = hobig_int_div(&powers.remainder, m);
