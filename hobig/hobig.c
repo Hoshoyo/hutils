@@ -40,12 +40,13 @@ typedef enum {
     TIME_SLOT_MOD_DIV,
 } TimeSlot;
 static double elapsed_times[64];
+static int    execution_count[64];
 
 #define COLLECT_TIMES 0
 
 #if COLLECT_TIMES
 #define TIME_COUNT() double time_count_start = os_time_us()
-#define TIME_END(X) elapsed_times[X] += os_time_us() - time_count_start
+#define TIME_END(X) elapsed_times[X] += os_time_us() - time_count_start; execution_count[X]++
 #else
 #define TIME_COUNT()
 #define TIME_END(X)
@@ -53,12 +54,12 @@ static double elapsed_times[64];
 
 void
 print_time_slots() {
-    printf("Multiply:  %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_MULTIPLY]);
-    printf("Divide:    %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_DIVIDE]);
-    printf("Add:       %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_ADD]);
-    printf("Subtract:  %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_SUBTRACT]);
-    printf("Compare:   %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_COMPARE]);
-    printf("ModDivide: %.2f ms\n", 0.001 * elapsed_times[TIME_SLOT_MOD_DIV]);
+    printf("Multiply:  %.2f ms, executed %d times\n", 0.001 * elapsed_times[TIME_SLOT_MULTIPLY], execution_count[TIME_SLOT_MULTIPLY]);
+    printf("Divide:    %.2f ms, executed %d times\n", 0.001 * elapsed_times[TIME_SLOT_DIVIDE], execution_count[TIME_SLOT_DIVIDE]);
+    printf("Add:       %.2f ms, executed %d times\n", 0.001 * elapsed_times[TIME_SLOT_ADD], execution_count[TIME_SLOT_ADD]);
+    printf("Subtract:  %.2f ms, executed %d times\n", 0.001 * elapsed_times[TIME_SLOT_SUBTRACT], execution_count[TIME_SLOT_SUBTRACT]);
+    printf("Compare:   %.2f ms, executed %d times\n", 0.001 * elapsed_times[TIME_SLOT_COMPARE], execution_count[TIME_SLOT_COMPARE]);
+    printf("ModDivide: %.2f ms, executed %d times\n", 0.001 * elapsed_times[TIME_SLOT_MOD_DIV], execution_count[TIME_SLOT_MOD_DIV]);
 }
 
 typedef struct {
@@ -89,6 +90,49 @@ print_number(unsigned char* num, int length) {
         printf("%d", num[i]);
     }
     if(!seen_number) printf("0");
+}
+
+u64 bigendian_word(u64 v) {
+    u64 r = 
+        ((v & 0xff00000000000000) >> 56) |
+        ((v & 0xff000000000000) >> 40) |
+        ((v & 0xff0000000000) >> 24) |
+        ((v & 0xff00000000) >> 8) |
+        ((v & 0xff000000) << 8) |
+        ((v & 0xff0000) << 24) |
+        ((v & 0xff00) << 40) |
+        ((v & 0xff) << 56)
+    ;
+    return r;
+}
+
+HoBigInt
+hobig_int_from_memory(const char* m, int length, bool little_endian) {
+    HoBigInt result = {0};
+
+    int arr_length = (length + sizeof(u64) - 1) / sizeof(u64);
+    result.value = array_new_len(u64, arr_length);
+
+    int block_count = length / sizeof(u64);
+    int rest = length % sizeof(u64);
+
+    int i = length;
+	for (int k = 0; i >= sizeof(u64); k++) {
+        result.value[k] = bigendian_word(*(u64*)&m[i-sizeof(u64)]);
+		i -= sizeof(u64);
+    }
+    if (i > 0) {
+		u64 d = 0;
+		for (int s = 0; i > 0; s += 8) {
+			d |= (u64)(m[i-1]) << s;
+			i--;
+		}
+	    result.value[arr_length-1] = d;
+	}
+
+    array_length(result.value) = arr_length;
+
+    return result;
 }
 
 // a will be the destination
@@ -763,12 +807,6 @@ miller_rabin_probably_prime(HoBigInt* in, int k) {
         HoBigInt a = hobig_random(&n_minus_one);
         
         // Calculate b0 => a^m mod n
-        hobig_int_print(a);
-        printf(" ^ \n");
-        hobig_int_print(d);
-        printf(" = \n");
-        hobig_int_print(original);
-        printf("\n");
         HoBigInt x = hobig_int_mod_div(&a, &d, &original);
 
         // First test equal to 1
@@ -814,17 +852,16 @@ hobig_random_possible_prime(int bits) {
 
     int chunk_count = bits / (sizeof(u64) * 8);
 
-    //HoBigInt result = {0};
-    //result.value = array_new(u64);
-    //array_allocate(result.value, chunk_count);
-    //array_length(result.value) = chunk_count;
-    HoBigInt result = hobig_new_dec("153392458296071963107880887583555032501439527140411452004720394688774126678888239594531516504934105357899399007158511389363148708316721782992358187218226659777199993925265865934713008875892997645801452594646519896964081799985888922519232167402335382803153639916590399970548572662260486323243767218023829281797", 0);
+    HoBigInt result = {0};
+    result.value = array_new(u64);
+    array_allocate(result.value, chunk_count);
+    array_length(result.value) = chunk_count;
 
-    int itcount = 0;
     while(1) {
-        //for(int i = 0; i < chunk_count; ++i) {
-        //    result.value[i] = random_64bit_integer();
-        //}
+        for(int i = 0; i < chunk_count; ++i) {
+            result.value[i] = random_64bit_integer();
+        }
+        
         *result.value |= 1; // make sure is odd
 
         HoBigInt_DivResult d = hobig_int_div(&result, &product_small_primes);
@@ -851,9 +888,7 @@ hobig_random_possible_prime(int bits) {
             break;
         }
 
-        itcount++;
         if(miller_rabin_probably_prime(&result, 20)) {
-        //if(itcount >= 200) {
             break;
         }
     }
