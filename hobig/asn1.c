@@ -1,10 +1,12 @@
+#include "asn1.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #define LIGHT_ARENA_IMPLEMENT
-#include "../light_arena.h"
-#include "hobig.c"
+#include "light_arena.h"
+#include "hobig.h"
 
+typedef unsigned char u8;
 typedef unsigned int u32;
 
 #define LITTLE_ENDIAN_32(X) (((X) << 24) | (((X) << 8) & 0xff0000) | (((X) >> 8) & 0xff00) | ((X) >> 24))
@@ -28,11 +30,9 @@ void print_bytes(char* b, int length) {
     }
 }
 
-typedef struct {
-    char* data;
-    int   length;
-    int   error;
-} Base64_Data;
+int is_whitespace(char c) {
+    return (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\v' || c == '\f');
+}
 
 Base64_Data 
 base64_decode(const char* in, int length) {
@@ -231,7 +231,7 @@ parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
                 length--;
                 extra_length++;
             }
-            HoBigInt b = hobig_int_from_memory(at, length, 0);
+            HoBigInt b = hobig_int_new_from_memory(at, length);
             DER_Node* node = arena_alloc(arena, sizeof(DER_Node)); //calloc(1, sizeof(DER_Node));
             node->kind = DER_INTEGER;
             node->length = length + advance + extra_length;
@@ -257,18 +257,6 @@ parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
     }
     return 0;
 }
-
-typedef struct {
-    HoBigInt E; // public exponent
-    HoBigInt N; // public modulus
-} PublicKey;
-
-typedef struct {
-    PublicKey public;
-    HoBigInt  P;
-    HoBigInt  Q;
-    HoBigInt  PrivateExponent;
-} PrivateKey;
 
 void
 public_key_print(PublicKey pk) {
@@ -523,7 +511,7 @@ asn1_parse_public_key(const u8* data, int length, u32* error) {
         return (PublicKey){0};
     }
 
-    HoBigInt exponent = hobig_int_from_memory(at, exponent_length, 0);
+    HoBigInt exponent = hobig_int_new_from_memory(at, exponent_length);
     at += exponent_length;
 
     int modulus_length = LITTLE_ENDIAN_32(*(int*)at);
@@ -536,7 +524,7 @@ asn1_parse_public_key(const u8* data, int length, u32* error) {
         return (PublicKey){0};
     }
 
-    HoBigInt modulus = hobig_int_from_memory(at, modulus_length, 0);
+    HoBigInt modulus = hobig_int_new_from_memory(at, modulus_length);
 
     PublicKey result = {0};
     result.E = exponent;
@@ -547,37 +535,62 @@ asn1_parse_public_key(const u8* data, int length, u32* error) {
     return result;
 }
 
-int main(int argc, char** argv) {
-    u32 error = 0;
-#if 0
-    char* key = "AAAAB3NzaC1yc2EAAAADAQABAAACAQDOL2ikG34/XVsFyKJJhOUECUAKNjKcMp/CeDfFOxoIXXFmTAOCYwRjW5DtDKMYxslwrfGSUFAtYRCNR0pEU7z3LgQ8NKjKp9kr5SKA6LhvH3yYpDfDoIbJ7cDu6Tvu9VOb8g2+AZP5JdAisrpKMkKsjYgaWCfrEcf6XSjUH8DSFfAgBYN0RfNHhOeQf3CeOzpL4F5vJpK3lyjwOVLaBk2nMm4xCCW4bisJZGMkcTBgmjYcOpu8rBVtuHWmtM+ckbHTeX8ASalZaSHBMejAKoepy9W/cEYrYoaHqmBb5qIOezlaR0nhutC5QIJWIC56ptI12tMqvMUKpfP4ybwHFGRaCpwMFvGLtBLjCPYMhHiok3rbBovqLa/aydKzZYPm4wmGgELL3qwVFvJDdFRv2Ja707wljeRonbTtKmnuyEwphr1G6zpbBLl9p34LoC433kqJTZl5IcFNq2CSrRMQn9W1jgkKHSsHZ6cX+1yQnJedcSlV0Tf8JM3a3g1dsjA0TssENAwPC8oD9ZQIdKE2Mi92PG/Ogl/+oq0lzRYoikyziakTU2LauN6ZE6DfbPAMUjWw+y/Q5HR1MmpnQ9hg5TdjZDm4cYGXTNITA8mQ9RhFPIgd7R1FUFj3qp065wBjjRUO1v44ND24plPRhPzBV+jNEWs/AdNUM9Im5ySJhg8AEQ==";
-    PublicKey pk = asn1_parse_public_key(key, strlen(key), &error);
-    if(error != 0) {
-        return 1;
-    } else {
-        public_key_print(pk);
+PublicKey 
+asn1_parse_public_key_from_file(const char* filename, int* error) {
+    FILE* file = fopen(filename, "rb");
+
+    if(!file) {
+        fprintf(stderr, "Could not find file %s\n", filename);
+        if(error) *error = 1;
+        return (PublicKey){0};
     }
-#endif
 
-#if 0
-    char* key = "MIIEowIBAAKCAQEAq6Ii4BLMhIiX0x5gL+N79w5znglZ4cqyvVfnqBGHWGBc4SapnzQSbN1dzv0wP3M1QV/J9V1tNyc6qPWPuK29WL0U5VN2cOQ2thAL32NCOPBKfFyhcUIylj6A5BXIJPpzzPowmg4P8aB9m8Fr6WZ7Bx6PlZ4SX+N+SHjw52seqSPz9hfMYD+4D4XTtkXNzaKJraInpfqfx27Ar7sCwvlcuNP7I2GJajLCvwhdktwlmwdPbbW1xxw3QT8izKKQOcYExzVigiNkgiPBN+mMA/iX+aPZRoMDorgwAEnihl8T7QqtJVUBbbrlma0fZDaQwLt5+fuN7pp2hXbNfQ+qviioTQIDAQABAoIBAQCKKq3UoI2Pq749MFjSdFjZHAMrF/AJennFPzy36dSA6qIahltKVEr45IOeG+h5S691fz0/jwRav/PTDEu0qfihtSVbL4NLggwhKG3GWUt4NshfsNouKNI8bPippHdIfW43drkla2ieZUp41o6eh+dGZe3EzkmQc7y3btTQF0XJdlwfjFhrR6ZoAw/Im8DCE11Z6+731uagHvHsFGWZ/HQ/oG7NG9c8evoTb5ILVaK+Vqwrkeu7HX2VL1VMiUZED6Tiiq1+rSR4dCoSqEy62ZWxybVG2rFHSOaU4shJDu4cA476ttwucts5Ia5Z3JGocjCBlG1DKl83LbnhEBaNFvNpAoGBANsQC9xnkrWwFYijBKUs1SXX3Q99QH6KSQW5FRiuwVDc43h878WpSIEBTS7qFRw33c3e8dkg9tsYmeEmWdOpUN5oFatSCaZSkh8w+HqA6aw68q4pkwQ8llUgyzl1DrfNpctFQY/POoKbTtehmO/WumJhv+i3TY3GTOYi4YaEJee/AoGBAMiSxzMA5TXs/mtfv8djUo99fWRNnX+uEENqh755VPIcuYWBbXa8UGLhcjcZFOqarQCNVA69VY9PFNQzYLkBggr28jhF6eIutjeQDDckIpvqywa3vLUtdzfTWPsrii825oNDUR9bGO+xOKhh3/tbWxRB4saDyOxtT0zq73/mrdLzAoGAN+veu0MNZqgutxS2aNwLBYAXhI662hK/FWDsC8MAwn3A688o/lJ6mcQVSfajsPJqAtX48y7BFakwDxPVNn0wkbYMYhGtOPI3LxM3Oz6RaFAcB23BhAFbdxvKBT7mpPEwc7WYSPfjvdebxtwPyJoONnMxpFy2xYxrsQwSel5dts0CgYA+nry8asIlFOnVwh4Q9Sx4ihhU8XqDu2dudNsOl7jyog815FO1p1N9m59aHmWOXV439ufQdkI5LNp26dd/yz27iJ/U+9bqe+T98eYubQS1Ixfh8Allk11OO5jjShOpa/2J68FvBbUCWJU01OHmCv6jk3Jmwgw/7Fy+yfaeOvn4CwKBgG50oT8HaR3kwfMl1i0w6tExVv4HctvHsYwEwEmTeLP4K5BGYP+hlrCZF6463+GAsrK/0lKA0FudqvdeJxDuhRDCprtug0W/KU/h4AueDalCTcuRSNrfkZFqzQz3Itj3T1JEY/u0WxwggatBEyV2jvgTZCIB9XZT+6PoXpCAInBR";
-    PrivateKey p = asn1_parse_x509_private(key, strlen(key), &error);
-    if(error != 0) {
-        return 1;
-    } else {
-        private_key_print(p);
+    fseek(file, 0, SEEK_END);
+    int file_size = (int)ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    if(file_size == 0) {
+        fclose(file);
+        fprintf(stderr, "File %s is empty\n", filename);
+        if(error) *error = 1;
+        return (PublicKey){0};
     }
-    
-    private_key_free(p);
-#endif
 
-#if 0
-    char* key = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq6Ii4BLMhIiX0x5gL+N79w5znglZ4cqyvVfnqBGHWGBc4SapnzQSbN1dzv0wP3M1QV/J9V1tNyc6qPWPuK29WL0U5VN2cOQ2thAL32NCOPBKfFyhcUIylj6A5BXIJPpzzPowmg4P8aB9m8Fr6WZ7Bx6PlZ4SX+N+SHjw52seqSPz9hfMYD+4D4XTtkXNzaKJraInpfqfx27Ar7sCwvlcuNP7I2GJajLCvwhdktwlmwdPbbW1xxw3QT8izKKQOcYExzVigiNkgiPBN+mMA/iX+aPZRoMDorgwAEnihl8T7QqtJVUBbbrlma0fZDaQwLt5+fuN7pp2hXbNfQ+qviioTQIDAQAB";
-    PublicKey pk = asn1_parse_x509_public(key, strlen(key), &error);
-    public_key_print(pk);
+    void* memory = calloc(1, file_size + 1);
+    if(fread(memory, file_size, 1, file) != 1) {
+        fclose(file);
+        free(memory);
+        fprintf(stderr, "Could not read entire file %s\n", filename);
+        if(error) *error = 1;
+        return (PublicKey){0};
+    }
+    fclose(file);
 
-    public_key_free(pk);
-#endif
+    // File contents are loaded
+    char* at = memory;
+    int at_index = 0;
+    while(is_whitespace(*at)) { at++; at_index++; }
+    if(file_size < sizeof("ssh-rsa") - 1) {
+        // file size is not long enough
+        free(memory);
+        fprintf(stderr, "File format is invalid\n");
+        if(error) *error = 1;
+        return (PublicKey){0};
+    }
+    if(strncmp("ssh-rsa", at, sizeof("ssh-rsa") - 1) != 0) {
+        free(memory);
+        fprintf(stderr, "Invalid file format, expected ssh-rsa prefix\n");
+        if(error) *error = 1;
+        return (PublicKey){0};
+    }
+    at += sizeof("ssh-rsa") - 1;
+    while(is_whitespace(*at)) { at++; at_index++; }
 
-    return 0;
+    char* start_data = at;
+    while(!is_whitespace(*at)) { at++; at_index++; }
+    PublicKey pubk = asn1_parse_public_key(start_data, at - start_data, error);
+
+    // email may follow but we ignore it
+
+    return pubk;
 }

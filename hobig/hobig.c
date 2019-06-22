@@ -1,3 +1,5 @@
+#include "hobig.h"
+
 typedef int bool;
 typedef unsigned char u8;
 typedef unsigned long long int u64;
@@ -62,11 +64,6 @@ print_time_slots() {
     printf("ModDivide: %.2f ms, executed %d times\n", 0.001 * elapsed_times[TIME_SLOT_MOD_DIV], execution_count[TIME_SLOT_MOD_DIV]);
 }
 
-typedef struct {
-    int  negative;
-    u64* value;    // dynamic light array
-} HoBigInt;
-
 HoBigInt 
 hobig_int_new(u64 v) {
     HoBigInt result = { 0, array_new(u64) };
@@ -107,7 +104,7 @@ u64 bigendian_word(u64 v) {
 }
 
 HoBigInt
-hobig_int_from_memory(const char* m, int length, bool little_endian) {
+hobig_int_new_from_memory(const char* m, int length) {
     HoBigInt result = {0};
     if(length == 0) return result;
 
@@ -459,7 +456,7 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
     TIME_END(TIME_SLOT_SUBTRACT);
 }
 
-void 
+static void 
 hobig_int_mul_pow10(HoBigInt* start, int p) {
     if(p == 0) {
         return;
@@ -516,7 +513,7 @@ hobig_int_mul(HoBigInt* dst, HoBigInt* src) {
 }
 
 HoBigInt 
-hobig_new_dec(const char* number, unsigned int* error) {
+hobig_int_new_decimal(const char* number, unsigned int* error) {
     HoBigInt result = {0};
     if(error) *error = 0;
 
@@ -596,11 +593,6 @@ hobig_new_dec(const char* number, unsigned int* error) {
 
     return result;
 }
-
-typedef struct {
-    HoBigInt quotient;
-    HoBigInt remainder;
-} HoBigInt_DivResult;
 
 HoBigInt_DivResult
 hobig_int_div(HoBigInt* dividend, HoBigInt* divisor) {
@@ -858,12 +850,15 @@ hobig_random_possible_prime(int bits) {
     array_allocate(result.value, chunk_count);
     array_length(result.value) = chunk_count;
 
+    int its = 0;
     while(1) {
         for(int i = 0; i < chunk_count; ++i) {
             result.value[i] = random_64bit_integer();
         }
         
         *result.value |= 1; // make sure is odd
+        hobig_int_print(result);
+        printf("\n");
 
         HoBigInt_DivResult d = hobig_int_div(&result, &product_small_primes);
         u64 mod = *d.remainder.value;
@@ -889,6 +884,7 @@ hobig_random_possible_prime(int bits) {
             break;
         }
 
+        printf("it: %d\n", its++);
         if(miller_rabin_probably_prime(&result, 20)) {
             break;
         }

@@ -8,6 +8,23 @@ import (
 	"time"
 )
 
+func testDivisionBenchmark() {
+	v := new(big.Int)
+	d := new(big.Int)
+	d, _ = d.SetString("3230291580290704972938712983791287012085289572097481203112093812908390218093890218903120", 10)
+
+	start := time.Now()
+
+	for k := 0; k < 10000; k++ {
+		for j := 0; j < 16; j++ {
+			v, _ = v.SetString("9812029183092109833851794719827489214120981798579728720418092047123721837128371298739812", 10)
+			v = v.Div(v, d)
+		}
+	}
+
+	fmt.Println(float64(time.Now().Sub(start).Nanoseconds()) / 1000000.0)
+}
+
 func testMultiplyBenchmark() {
 	v := new(big.Int)
 	d := new(big.Int)
@@ -22,10 +39,10 @@ func testMultiplyBenchmark() {
 		}
 	}
 
-	fmt.Println(v)
+	//fmt.Println(v)
 
-	//fmt.Println(float64(time.Now().Sub(start).Nanoseconds()) / 1000000.0)
-	fmt.Println(time.Now().Sub(start))
+	fmt.Println(float64(time.Now().Sub(start).Nanoseconds()) / 1000000.0)
+	//fmt.Println(time.Now().Sub(start))
 }
 
 func testAdditionBenchmark() {
@@ -76,6 +93,8 @@ func main() {
 		testSubtractionBenchmark()
 	case "mul":
 		testMultiplyBenchmark()
+	case "div":
+		testDivisionBenchmark()
 	default:
 		fmt.Println("Invalid benchmark name")
 		os.Exit(1)

@@ -1,9 +1,9 @@
 all: asm
-	#@gcc -g -O2 test/hobig_test.c -o bin/big bin/random.o
-	#@bin/big
-	gcc -g asn1.c -o bin/asn1 bin/random.o
-	./bin/asn1
+	gcc -g pkcs1.c hobig.c asn1.c bin/random.o -o bin/pkcs1
 
+asn1: asm
+	gcc -g test/asn1_test.c asn1.c hobig.c -o bin/asn1 bin/random.o
+	./bin/asn1
 debug: asm
 	@gcc -g test/hobig_test.c -o bin/big bin/random.o
 release: asm
