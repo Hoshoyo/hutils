@@ -109,6 +109,7 @@ u64 bigendian_word(u64 v) {
 HoBigInt
 hobig_int_from_memory(const char* m, int length, bool little_endian) {
     HoBigInt result = {0};
+    if(length == 0) return result;
 
     int arr_length = (length + sizeof(u64) - 1) / sizeof(u64);
     result.value = array_new_len(u64, arr_length);
