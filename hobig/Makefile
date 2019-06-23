@@ -1,6 +1,9 @@
-all: asm
-	gcc -g pkcs1.c hobig.c asn1.c bin/random.o -o bin/pkcs1
+all: debug
+	@bin/big
 
+pkcs1: asm
+	@gcc -g pkcs1.c hobig.c asn1.c bin/random.o -o bin/pkcs1
+	@bin/pkcs1
 asn1: asm
 	gcc -g test/asn1_test.c asn1.c hobig.c -o bin/asn1 bin/random.o
 	./bin/asn1

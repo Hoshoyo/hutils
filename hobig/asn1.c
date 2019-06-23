@@ -299,7 +299,7 @@ private_key_free(PrivateKey p) {
 // Reference:
 // https://crypto.stackexchange.com/questions/21102/what-is-the-ssl-private-key-file-format
 PrivateKey
-asn1_parse_x509_private(const u8* data, int length, u32* error) {
+asn1_parse_pem_private(const u8* data, int length, u32* error) {
     Base64_Data r = base64_decode(data, length);
     if(r.error != 0) {
         fprintf(stderr, "Could not parse key base64 data\n");
@@ -413,7 +413,7 @@ asn1_parse_x509_private(const u8* data, int length, u32* error) {
 
 // Parses PEM file of a public key
 PublicKey
-asn1_parse_x509_public(const u8* data, int length, u32* error) {
+asn1_parse_pem_public(const u8* data, int length, u32* error) {
     Base64_Data r = base64_decode(data, length);
     if(r.error != 0) {
         fprintf(stderr, "Could not parse key base64 data\n");
@@ -535,14 +535,13 @@ asn1_parse_public_key(const u8* data, int length, u32* error) {
     return result;
 }
 
-PublicKey 
-asn1_parse_public_key_from_file(const char* filename, int* error) {
+static void*
+load_entire_file(const char* filename, int* out_size) {
     FILE* file = fopen(filename, "rb");
 
     if(!file) {
         fprintf(stderr, "Could not find file %s\n", filename);
-        if(error) *error = 1;
-        return (PublicKey){0};
+        return 0;
     }
 
     fseek(file, 0, SEEK_END);
@@ -552,19 +551,28 @@ asn1_parse_public_key_from_file(const char* filename, int* error) {
     if(file_size == 0) {
         fclose(file);
         fprintf(stderr, "File %s is empty\n", filename);
-        if(error) *error = 1;
-        return (PublicKey){0};
+        return 0;
     }
 
     void* memory = calloc(1, file_size + 1);
+
     if(fread(memory, file_size, 1, file) != 1) {
         fclose(file);
         free(memory);
         fprintf(stderr, "Could not read entire file %s\n", filename);
-        if(error) *error = 1;
-        return (PublicKey){0};
+        return 0;
     }
     fclose(file);
+
+    if(out_size) *out_size = file_size;
+    return memory;
+}
+
+PublicKey 
+asn1_parse_public_key_from_file(const char* filename, int* error) {
+    int file_size = 0;
+    void* memory = load_entire_file(filename, &file_size);
+    if(!memory) { if(error) *error |= 1; return (PublicKey){0}; };
 
     // File contents are loaded
     char* at = memory;
@@ -593,4 +601,110 @@ asn1_parse_public_key_from_file(const char* filename, int* error) {
     // email may follow but we ignore it
 
     return pubk;
+}
+
+PublicKey
+asn1_parse_pem_public_key_from_file(const char* filename, int* error) {
+    int file_size = 0;
+    void* memory = load_entire_file(filename, &file_size);
+    if(!memory) { if(error) *error |= 1; return (PublicKey){0}; };
+
+    // File contents are loaded
+    char* at = memory;
+    int at_index = 0;
+
+    while(is_whitespace(*at)) { at++; at_index++; }
+    if((file_size - at_index < sizeof("-----BEGIN PUBLIC KEY-----") - 1) ||
+        strncmp("-----BEGIN PUBLIC KEY-----", at, sizeof("-----BEGIN PUBLIC KEY-----") - 1) != 0) 
+    {
+        // File is not large enough or pattern not found
+        free(memory);
+        fprintf(stderr, "File format invalid, expected -----BEGIN PUBLIC KEY-----\n");
+        return (PublicKey){0};
+    }
+
+    at += sizeof("-----BEGIN PUBLIC KEY-----") - 1;
+    while(is_whitespace(*at)) { at++; at_index++; }
+
+    char* start_data = at;
+    while(*at != '-') { at++; at_index++; }
+    int data_bytes = at - start_data;
+    char* d = calloc(1, data_bytes + 1);
+
+    // -----END PUBLIC KEY----- follows
+    if((file_size - at_index < sizeof("-----END PUBLIC KEY-----") - 1) ||
+        strncmp("-----END PUBLIC KEY-----", at, sizeof("-----END PUBLIC KEY-----") - 1) != 0) 
+    {
+        // File is not large enough or pattern not found
+        free(d);
+        free(memory);
+        fprintf(stderr, "File format invalid, expected -----END PUBLIC KEY-----\n");
+        return (PublicKey){0};
+    }
+
+    at = start_data;
+    int trimmed_length = 0;
+    for(int i = 0, k = 0; i < data_bytes; ++i, at++) {
+        if(!is_whitespace(*at)) {
+            d[k++] = *at;
+            trimmed_length++;
+        }
+    }
+
+    PublicKey result = asn1_parse_pem_public(d, trimmed_length, error);
+
+    return result;
+}
+
+PrivateKey
+asn1_parse_pem_private_key_from_file(const char* filename, int* error) {
+    int file_size = 0;
+    void* memory = load_entire_file(filename, &file_size);
+    if(!memory) { if(error) *error |= 1; return (PrivateKey){0}; };
+
+    // File contents are loaded
+    char* at = memory;
+    int at_index = 0;
+
+    while(is_whitespace(*at)) { at++; at_index++; }
+    if((file_size - at_index < sizeof("-----BEGIN RSA PRIVATE KEY-----") - 1) ||
+        strncmp("-----BEGIN RSA PRIVATE KEY-----", at, sizeof("-----BEGIN RSA PRIVATE KEY-----") - 1) != 0) 
+    {
+        // File is not large enough or pattern not found
+        free(memory);
+        fprintf(stderr, "File format invalid, expected -----BEGIN RSA PRIVATE KEY-----\n");
+        return (PrivateKey){0};
+    }
+
+    at += sizeof("-----BEGIN RSA PRIVATE KEY-----") - 1;
+    while(is_whitespace(*at)) { at++; at_index++; }
+
+    char* start_data = at;
+    while(*at != '-') { at++; at_index++; }
+    int data_bytes = at - start_data;
+    char* d = calloc(1, data_bytes + 1);
+
+    // -----END RSA PRIVATE KEY----- follows
+    if((file_size - at_index < sizeof("-----END RSA PRIVATE KEY-----") - 1) ||
+        strncmp("-----END RSA PRIVATE KEY-----", at, sizeof("-----END RSA PRIVATE KEY-----") - 1) != 0) 
+    {
+        // File is not large enough or pattern not found
+        free(d);
+        free(memory);
+        fprintf(stderr, "File format invalid, expected -----END PUBLIC KEY-----\n");
+        return (PrivateKey){0};
+    }
+
+    at = start_data;
+    int trimmed_length = 0;
+    for(int i = 0, k = 0; i < data_bytes; ++i, at++) {
+        if(!is_whitespace(*at)) {
+            d[k++] = *at;
+            trimmed_length++;
+        }
+    }
+
+    PrivateKey result = asn1_parse_pem_private(d, trimmed_length, error);
+
+    return result;
 }

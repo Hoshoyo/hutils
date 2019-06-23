@@ -346,7 +346,7 @@ hobig_int_add(HoBigInt* dst, HoBigInt* src) {
     u64 carry = 0;
     for(int i = 0; i < array_length(src->value); ++i) {
         u64 sum = dst->value[i] + src->value[i] + carry;
-        if(sum < src->value[i]) {
+        if(sum <= src->value[i] && dst->value[i] > 0 && src->value[i] > 0) {
             carry = 1;
         } else {
             carry = 0;
@@ -414,6 +414,7 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
                 u64 start = dst->value[i];
                 dst->value[i] -= borrow;
                 dst->value[i] -= (src->value[i]);
+                // TODO(psv): check this for correctness
                 if(dst->value[i] > start) {
                     borrow = 1;
                 } else {
@@ -678,12 +679,15 @@ hobig_int_mod_div(HoBigInt* n, HoBigInt* exp, HoBigInt* m) {
                 // Sum the power of 2 result to the final 
                 // result when the bit is set
                 hobig_int_mul(&final, &powers.remainder);
+
 				HoBigInt_DivResult accumulated = hobig_int_div(&final, m);
 				hobig_free(final);
 				hobig_free(accumulated.quotient);
 				final = accumulated.remainder;
-            }
+
+            }            
             hobig_int_mul(&powers.remainder, &powers.remainder);
+
             HoBigInt_DivResult ps = hobig_int_div(&powers.remainder, m);
 
             hobig_free(powers.quotient);
