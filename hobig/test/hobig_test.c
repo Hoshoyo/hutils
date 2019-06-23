@@ -43,7 +43,7 @@ void miller_rabin_test() {
         }
     }
 
-    HoBigInt t = hobig_random_possible_prime(512);
+    HoBigInt t = hobig_random_possible_prime(500);
     int prime = miller_rabin_probably_prime(&t, 20);
     hobig_int_print(t);
     printf(" is probably prime (%d)\n", hobig_int_bitcount(&t));
@@ -114,8 +114,8 @@ void test_sub() {
 int main(int argc, char** argv) {
     double start = os_time_us();
 
-    test_sub();
-    //test_hobig_mod_div();
+    miller_rabin_test();
+
     printf("\nelapsed: %.2fms\n", 0.001 * (os_time_us() - start));
     return 0;
 }
