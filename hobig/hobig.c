@@ -346,7 +346,8 @@ hobig_int_add(HoBigInt* dst, HoBigInt* src) {
     u64 carry = 0;
     for(int i = 0; i < array_length(src->value); ++i) {
         u64 sum = dst->value[i] + src->value[i] + carry;
-        if(sum <= src->value[i] && dst->value[i] > 0 && src->value[i] > 0) {
+        if(sum < src->value[i] || 
+            (sum == src->value[i] && dst->value[i] > 0 && src->value[i] > 0)) {
             carry = 1;
         } else {
             carry = 0;
@@ -414,8 +415,8 @@ hobig_int_sub(HoBigInt* dst, HoBigInt* src) {
                 u64 start = dst->value[i];
                 dst->value[i] -= borrow;
                 dst->value[i] -= (src->value[i]);
-                // TODO(psv): check this for correctness
-                if(dst->value[i] > start) {
+                if(dst->value[i] > start 
+                    || (dst->value[i] == start && dst->value[i] > 0 && src->value[i] > 0)) {
                     borrow = 1;
                 } else {
                     borrow = 0;
