@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 #define LIGHT_ARENA_IMPLEMENT
 #include "light_arena.h"
 #include "hobig.h"
@@ -99,6 +100,11 @@ typedef struct {
 } DER_Bit_String;
 
 typedef struct {
+    int length;
+    struct DER_Node_t* data;
+} DER_Oct_String;
+
+typedef struct {
     int  length;
     int* data;
 } DER_Object_ID;
@@ -112,6 +118,7 @@ typedef struct DER_Node_t {
     int            length;
     union {
         DER_Bit_String bit_string;
+        DER_Oct_String oct_string;
         DER_Sequence   sequence;
         DER_Object_ID  object_id;
         DER_Integer    integer;
@@ -158,7 +165,7 @@ parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
             if(error && *error) return 0;
             at += advance;
 
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node)); //calloc(1, sizeof(DER_Node));
+            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_SEQUENCE;
             node->length = length + advance;
             node->sequence.length = length;
@@ -183,7 +190,7 @@ parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
             at += advance;
 
             int unused = *at++;
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node)); //calloc(1, sizeof(DER_Node));
+            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_BIT_STRING;
             node->length = length + advance;
             node->bit_string.length = length;
@@ -192,29 +199,57 @@ parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
             at += length;
             return node;
         } break;
+        case DER_OCT_STRING: {
+            int length = der_get_length(at, error, &advance);
+            if(error && *error) return 0;
+            at += advance;
+
+            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
+            node->kind = DER_OCT_STRING;
+            node->length = length + advance;
+            node->oct_string.length = length;
+            node->oct_string.data = parse_der(arena, at, length, error);
+            at += length;
+            return node;
+        } break;
         case DER_OBJECT_ID: {
             int length = der_get_length(at, error, &advance);
             if(error && *error) return 0;
             at += advance;
 
-            int* nodes = arena_alloc(arena, (length + 1) * sizeof(int)); //calloc(1, (length + 1) * sizeof(int));
+            int* nodes = arena_alloc(arena, (length + 1) * sizeof(int));
             int v0 = *at;
+            
+            u8* end_ = at + length;
             at++;
             nodes[0] = v0 / 40;
             nodes[1] = v0 - (nodes[0] * 40);
 
-            for(int k = 2; k < length + 1; ++k) {
+            int k = 2;
+            for(; at < end_; ++k) {
                 if((*at & 0x80) == 0) {
                     nodes[k] = *at++ & 0x7f;
                 } else {
-                    // ignore it for now
-                    at++;
+                    u8* s = at;
+                    while(*s & 0x80) s++;
+                    int count = s - at + 1;
+                    if(count > 4) {
+                        // too many bytes encoded
+                        if(error) *error |= 1;
+                        return 0;
+                    }
+                    int res = 0;
+                    for(int t = count - 1; t >= 0; --t) {
+                        res |= ((*at) & 0x7f) << ((t * 8) - t);
+                        at++;
+                    }
+                    nodes[k] = res;
                 }
             }
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node)); //calloc(1, sizeof(DER_Node));
+            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_OBJECT_ID;
             node->length = length + advance;
-            node->object_id.length = length + 1;
+            node->object_id.length = k;
             node->object_id.data = nodes;
             return node;
         } break;
@@ -232,7 +267,7 @@ parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
                 extra_length++;
             }
             HoBigInt b = hobig_int_new_from_memory(at, length);
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node)); //calloc(1, sizeof(DER_Node));
+            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_INTEGER;
             node->length = length + advance + extra_length;
             node->integer.i = b;
@@ -248,12 +283,19 @@ parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
                     return 0;
                 }
             }
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node)); //calloc(1, sizeof(DER_Node));
+            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_NULL;
             node->length = 2;
             return node;
         } break;
-        break;
+        default: {
+            int length = der_get_length(at, error, &advance);
+            at += advance;
+            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
+            node->kind = DER_NULL;
+            node->length = advance + length;
+            return node;
+        } break;
     }
     return 0;
 }
@@ -305,6 +347,7 @@ asn1_parse_pem_private(const u8* data, int length, u32* error) {
         fprintf(stderr, "Could not parse key base64 data\n");
         free(r.data);
         if(error) *error |= 1;
+        return (PrivateKey){0};
     }
 
     Light_Arena* arena = arena_create(65535);
@@ -412,6 +455,7 @@ asn1_parse_pem_private(const u8* data, int length, u32* error) {
 }
 
 // Parses PEM file of a public key
+// Reference: https://medium.com/@bn121rajesh/understanding-rsa-public-key-70d900b1033c
 PublicKey
 asn1_parse_pem_public(const u8* data, int length, u32* error) {
     Base64_Data r = base64_decode(data, length);
@@ -419,6 +463,7 @@ asn1_parse_pem_public(const u8* data, int length, u32* error) {
         fprintf(stderr, "Could not parse key base64 data\n");
         free(r.data);
         if(error) *error |= 1;
+        return (PublicKey){0};
     }
 
     Light_Arena* arena = arena_create(65535);
@@ -533,6 +578,22 @@ asn1_parse_public_key(const u8* data, int length, u32* error) {
     free(r.data);
 
     return result;
+}
+
+void
+asn1_parse_pem_certificate(const u8* data, int length, u32* error) {
+    Base64_Data r = base64_decode(data, length);
+    if(r.error != 0) {
+        fprintf(stderr, "Could not parse key base64 data\n");
+        free(r.data);
+        if(error) *error |= 1;
+    }
+
+    Light_Arena* arena = arena_create(65535);
+    DER_Node* node = parse_der(arena, r.data, r.length, error);
+    PublicKey pk = {0};
+
+
 }
 
 static void*

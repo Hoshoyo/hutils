@@ -1,5 +1,5 @@
-all: debug
-	@bin/big
+all: asn1
+	@bin/asn1
 
 pkcs1: asm
 	@gcc -g pkcs1.c hobig.c asn1.c bin/random.o -o bin/pkcs1

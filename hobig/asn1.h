@@ -24,6 +24,9 @@ PublicKey  asn1_parse_public_key_from_file(const char* filename, int* error);
 PublicKey  asn1_parse_pem_public_key_from_file(const char* filename, int* error);
 PrivateKey asn1_parse_pem_private_key_from_file(const char* filename, int* error);
 
+
+void asn1_parse_pem_certificate(const unsigned char* data, int length, unsigned int* error);
+
 // Public Key in the format of openssl
 PublicKey asn1_parse_public_key(const unsigned char* data, int length, unsigned int* error);
 
