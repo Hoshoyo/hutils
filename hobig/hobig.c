@@ -862,8 +862,6 @@ hobig_random_possible_prime(int bits) {
         }
         
         *result.value |= 1; // make sure is odd
-        hobig_int_print(result);
-        printf("\n");
 
         HoBigInt_DivResult d = hobig_int_div(&result, &product_small_primes);
         u64 mod = *d.remainder.value;
@@ -889,7 +887,6 @@ hobig_random_possible_prime(int bits) {
             break;
         }
 
-        printf("it: %d\n", its++);
         if(miller_rabin_probably_prime(&result, 20)) {
             break;
         }

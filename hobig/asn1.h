@@ -20,12 +20,47 @@ typedef struct {
     HoBigInt  PrivateExponent;
 } PrivateKey;
 
+typedef enum {
+    Sig_RSA,
+    Sig_MD2WithRSA,
+    Sig_MD5WithRSA,
+    Sig_SHA1WithRSA,
+    Sig_SHA256WithRSA,
+    Sig_SHA384WithRSA,
+    Sig_SHA512WithRSA,
+    Sig_RSAPSS,
+    Sig_DSAWithSHA1,
+    Sig_DSAWithSHA256,
+    Sig_ECDSAWithSHA1,
+    Sig_ECDSAWithSHA256,
+    Sig_ECDSAWithSHA384,
+    Sig_ECDSAWithSHA512,
+} Signature_Algorithm;
+
+typedef struct {
+    int         length;
+    const char* data;
+} Cert_Metadata;
+
+typedef struct {
+    HoBigInt            serial_number;
+    PublicKey           public_key;
+    Signature_Algorithm type;
+    Signature_Algorithm signature_algorithm;
+    Cert_Metadata       common_name;
+    Cert_Metadata       country;
+    Cert_Metadata       state;
+    Cert_Metadata       locality;
+    Cert_Metadata       organization;
+    Cert_Metadata       email;
+} RSA_Certificate;
+
 PublicKey  asn1_parse_public_key_from_file(const char* filename, int* error);
 PublicKey  asn1_parse_pem_public_key_from_file(const char* filename, int* error);
 PrivateKey asn1_parse_pem_private_key_from_file(const char* filename, int* error);
 
 
-void asn1_parse_pem_certificate(const unsigned char* data, int length, unsigned int* error);
+RSA_Certificate asn1_parse_pem_certificate(const unsigned char* data, int length, unsigned int* error);
 
 // Public Key in the format of openssl
 PublicKey asn1_parse_public_key(const unsigned char* data, int length, unsigned int* error);

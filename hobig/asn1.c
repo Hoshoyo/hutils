@@ -5,6 +5,7 @@
 #include <assert.h>
 #define LIGHT_ARENA_IMPLEMENT
 #include "light_arena.h"
+#include "../light_array.h"
 #include "hobig.h"
 
 typedef unsigned char u8;
@@ -83,19 +84,21 @@ typedef enum {
     DER_UTF8_STRING      = 0x0c,
     DER_PRINTABLE_STRING = 0x13,
     DER_IA5_STRING       = 0x16,
+    DER_UTC_TIME         = 0x17,
     DER_BMP_STRING       = 0x1e,
     DER_SEQUENCE         = 0x30,
     DER_SET              = 0x31,
+    DER_CONSTRUCTED_SEQ  = 0xa0,
 } DER_Type;
 
 typedef struct {
-    int length;
-    struct DER_Node_t* data;
+    struct DER_Node_t** data; // light_array
 } DER_Sequence;
 
 typedef struct {
     int length;
     int unused;
+    const char* raw_data;
     struct DER_Node_t* data;
 } DER_Bit_String;
 
@@ -105,25 +108,48 @@ typedef struct {
 } DER_Oct_String;
 
 typedef struct {
+    int         length;
+    const char* data;
+} DER_UTF8_String;
+
+typedef struct {
+    int length;
+    const char* data;
+} DER_Print_String;
+
+typedef struct {
     int  length;
     int* data;
 } DER_Object_ID;
+
+typedef struct {
+    int length;
+    struct DER_Node_t* data;
+} DER_Set;
+
+typedef struct {
+    int         length;
+    const char* data;
+} DER_UTC_Time;
 
 typedef struct {
     HoBigInt i;
 } DER_Integer;
 
 typedef struct DER_Node_t {
-    DER_Type       kind;
-    int            length;
+    DER_Type kind;
+    int      length;
     union {
-        DER_Bit_String bit_string;
-        DER_Oct_String oct_string;
-        DER_Sequence   sequence;
-        DER_Object_ID  object_id;
-        DER_Integer    integer;
+        DER_Bit_String   bit_string;
+        DER_Oct_String   oct_string;
+        DER_UTF8_String  utf8_string;
+        DER_Print_String printable_string;
+        DER_Sequence     sequence;
+        DER_Set          set;
+        DER_Object_ID    object_id;
+        DER_Integer      integer;
+        DER_UTC_Time     utc_time;
     };
-    struct DER_Node_t* next;
 } DER_Node;
 
 int der_get_length(u8* data, unsigned int* error, int* advance) {
@@ -156,67 +182,77 @@ int der_get_length(u8* data, unsigned int* error, int* advance) {
 }
 
 DER_Node*
-parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
+parse_der(Light_Arena* arena, u8* data, int total_length, unsigned int* error) {
     u8* at = data;
     int advance = 0;
-    switch(*at) {
-        case DER_SEQUENCE: {
-            int length = der_get_length(at, error, &advance);
-            if(error && *error) return 0;
-            at += advance;
 
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
+    DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
+
+    if(*at == DER_NULL) {
+        at++;
+        if(*at++ != 0) {
+            // length is not zero, therefore invalid null value
+            if(error) {
+                *error |= 1;
+                return 0;
+            }
+        }
+        node->kind = DER_NULL;
+        node->length = 2;
+        return node;
+    }
+
+    // Get encoded length
+    int length = der_get_length(at, error, &advance);
+    if(error && *error) return 0;
+    u8 a = *at;
+    at += advance;
+
+    switch(a) {
+        case DER_SEQUENCE: {
             node->kind = DER_SEQUENCE;
             node->length = length + advance;
-            node->sequence.length = length;
-            node->sequence.data = parse_der(arena, at, length, error);
+
+            node->sequence.data = array_new(DER_Node);
+
+            array_push(node->sequence.data, parse_der(arena, at, length, error));
             if(error && *error) return 0;
 
-            length -= node->sequence.data->length;
-            at += node->sequence.data->length;
+            length -= node->sequence.data[0]->length;
+            at += node->sequence.data[0]->length;
 
-            DER_Node* n = node;
             while(length) {
-                n->next = parse_der(arena, at, length, error);
-                n = n->next;
+                DER_Node* n = parse_der(arena, at, length, error);
+                array_push(node->sequence.data, n);
                 length -= n->length;
                 at += n->length;
             }
-            return node;
         } break;
         case DER_BIT_STRING: {
-            int length = der_get_length(at, error, &advance);
-            if(error && *error) return 0;
-            at += advance;
-
             int unused = *at++;
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_BIT_STRING;
             node->length = length + advance;
             node->bit_string.length = length;
             node->bit_string.unused = unused;
+            node->bit_string.raw_data = at;
             node->bit_string.data = parse_der(arena, at, length, error);
             at += length;
-            return node;
+        } break;
+        case DER_UTF8_STRING: {
+            node->kind = DER_UTF8_STRING;
+            node->length = length + advance;
+            node->utf8_string.length = length;
+            node->utf8_string.data = at;
+            at += length;
         } break;
         case DER_OCT_STRING: {
-            int length = der_get_length(at, error, &advance);
-            if(error && *error) return 0;
-            at += advance;
-
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_OCT_STRING;
             node->length = length + advance;
             node->oct_string.length = length;
             node->oct_string.data = parse_der(arena, at, length, error);
             at += length;
-            return node;
         } break;
         case DER_OBJECT_ID: {
-            int length = der_get_length(at, error, &advance);
-            if(error && *error) return 0;
-            at += advance;
-
             int* nodes = arena_alloc(arena, (length + 1) * sizeof(int));
             int v0 = *at;
             
@@ -246,17 +282,12 @@ parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
                     nodes[k] = res;
                 }
             }
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_OBJECT_ID;
             node->length = length + advance;
             node->object_id.length = k;
             node->object_id.data = nodes;
-            return node;
         } break;
         case DER_INTEGER: {
-            int length = der_get_length(at, error, &advance);
-            if(error && *error) return 0;
-            at += advance;
             int extra_length = 0;
             if(*at & 0x80) {
                 // negative not supported
@@ -267,37 +298,39 @@ parse_der(Light_Arena* arena, u8* data, int length, unsigned int* error) {
                 extra_length++;
             }
             HoBigInt b = hobig_int_new_from_memory(at, length);
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_INTEGER;
             node->length = length + advance + extra_length;
             node->integer.i = b;
-
-            return node;
         } break;
-        case DER_NULL:{
-            at++;
-            if(*at++ != 0) {
-                // length is not zero, therefore invalid null value
-                if(error) {
-                    *error |= 1;
-                    return 0;
-                }
-            }
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
-            node->kind = DER_NULL;
-            node->length = 2;
-            return node;
+        case DER_IA5_STRING:
+        case DER_PRINTABLE_STRING: {
+            node->kind = DER_PRINTABLE_STRING;
+            node->length = length + advance;
+            node->printable_string.length = length;
+            node->printable_string.data = at;
+        } break;
+        case DER_SET: {
+            node->kind = DER_SET;
+            node->length = length + advance;
+            node->set.length = length;
+            node->set.data = parse_der(arena, at, length, error);
+        } break;
+        case DER_UTC_TIME: {
+            node->kind = DER_UTC_TIME;
+            node->length = length + advance;
+            node->utc_time.length = length;
+            node->utc_time.data = at;
+        } break;
+        case DER_CONSTRUCTED_SEQ: {
+            node->kind = DER_CONSTRUCTED_SEQ;
+            node->length = advance + length;
         } break;
         default: {
-            int length = der_get_length(at, error, &advance);
-            at += advance;
-            DER_Node* node = arena_alloc(arena, sizeof(DER_Node));
             node->kind = DER_NULL;
             node->length = advance + length;
-            return node;
         } break;
     }
-    return 0;
+    return node;
 }
 
 void
@@ -306,7 +339,7 @@ public_key_print(PublicKey pk) {
     hobig_int_print(pk.N);
     printf(", ");
     hobig_int_print(pk.E);
-    printf(" }");
+    printf(" }\n");
 }
 
 void
@@ -354,105 +387,51 @@ asn1_parse_pem_private(const u8* data, int length, u32* error) {
     DER_Node* node = parse_der(arena, r.data, r.length, error);
     PrivateKey key = {0};
 
-    if(node->kind != DER_SEQUENCE) {
-        if(error) *error |= 1;
-        fprintf(stderr, "Could not parse private key, expected DER sequence\n");
-        free(r.data);
-        arena_free(arena);
-        private_key_free(key);
+    #define FATAL_PEM_PRIVATE(T) if(error) *error |= 1; \
+        fprintf(stderr, T); \
+        free(r.data); \
+        arena_free(arena); \
+        private_key_free(key); \
         return (PrivateKey){0};
+
+    if(node->kind != DER_SEQUENCE) {
+        FATAL_PEM_PRIVATE("Could not parse private key, expected DER sequence\n");
     }
 
-    DER_Node* rsa_indication = node->sequence.data;
-    if(rsa_indication->kind != DER_INTEGER) {
-        if(error) *error |= 1;
-        fprintf(stderr, "Invalid RSA version, expected integer entry\n");
-        free(r.data);
-        arena_free(arena);
-        private_key_free(key);
-        return (PrivateKey){0};
+    DER_Node** seq = node->sequence.data;
+    if(!seq || array_length(seq) < 6) {
+        FATAL_PEM_PRIVATE("Could not parse private key, not enough integers in the file\n");
     }
-    if(rsa_indication->integer.i.value != 0) {
-        // must be 0 indicating 2 primes
-        if(error) *error |= 1;
-        fprintf(stderr, "Invalid RSA version, expected 0 value to indicate RSA key of 2 primes\n");
-        free(r.data);
-        arena_free(arena);
-        private_key_free(key);
-        return (PrivateKey){0};
-    }
-    DER_Node* next = node->next;
-    if(next->kind == DER_INTEGER) {
-        key.public.N = next->integer.i;
-    } else {
-        // error expected integer public modulus
-        if(error) *error |= 1;
-        fprintf(stderr, "Could not find public modulus in the file\n");
-        free(r.data);
-        arena_free(arena);
-        private_key_free(key);
-        return (PrivateKey){0};
-    }
-    next = next->next;
-    if(next->kind == DER_INTEGER) {
-        key.public.E = next->integer.i;
-    } else {
-        // error expected integer public exponent
-        if(error) *error |= 1;
-        fprintf(stderr, "Could not find public exponent in the file\n");
-        free(r.data);
-        arena_free(arena);
-        private_key_free(key);
-        return (PrivateKey){0};
-    }
-    next = next->next;
-    if(next->kind == DER_INTEGER) {
-        key.PrivateExponent = next->integer.i;
-    } else {
-        // error expected private exponent
-        if(error) *error |= 1;
-        fprintf(stderr, "Could not find private exponent in the file\n");
-        free(r.data);
-        arena_free(arena);
-        private_key_free(key);
-        return (PrivateKey){0};
-    }
-    next = next->next;
-    if(next->kind == DER_INTEGER) {
-        key.P = next->integer.i;
-    } else {
-        // error expected private P
-        if(error) *error |= 1;
-        fprintf(stderr, "Could not find private prime P in the file\n");
-        free(r.data);
-        arena_free(arena);
-        private_key_free(key);
-        return (PrivateKey){0};
-    }
-    next = next->next;
-    if(next->kind == DER_INTEGER) {
-        key.Q = next->integer.i;
-    } else {
-        // error expected private Q
-        if(error) *error |= 1;
-        fprintf(stderr, "Could not find private prime Q in the file\n");
-        free(r.data);
-        arena_free(arena);
-        private_key_free(key);
-        return (PrivateKey){0};
-    }
-    next = next->next;
-    while(next) {
-        if(next->kind == DER_INTEGER) {
-            hobig_free(next->integer.i);
+
+    for(int i = 0; i < 6; ++i) {
+        if(seq[i]->kind != DER_INTEGER) {
+            FATAL_PEM_PRIVATE("Could not parse private key, not enough integers in the file\n");
         }
-        next = next->next;
+    }
+
+    if(seq[0]->integer.i.value != 0) {
+        FATAL_PEM_PRIVATE("PEM file does not contain RSA with 2 primes\n");
+    }
+
+    // Public modulus
+    key.public.N = seq[1]->integer.i;
+    key.public.E = seq[2]->integer.i;
+    key.PrivateExponent = seq[3]->integer.i;
+    key.P = seq[4]->integer.i;
+    key.Q = seq[5]->integer.i;
+    
+    for(int i = 6; i < array_length(seq); ++i) {
+        if(seq[i]->kind == DER_INTEGER) {
+            hobig_free(seq[i]->integer.i);
+        }
     }
 
     free(r.data);
     arena_free(arena);
     return key;
 }
+
+static Signature_Algorithm signature_algorithm_from_oid(DER_Object_ID oid);
 
 // Parses PEM file of a public key
 // Reference: https://medium.com/@bn121rajesh/understanding-rsa-public-key-70d900b1033c
@@ -470,55 +449,42 @@ asn1_parse_pem_public(const u8* data, int length, u32* error) {
     DER_Node* node = parse_der(arena, r.data, r.length, error);
     PublicKey pk = {0};
 
+    #define FATAL_PEM_PUBLIC(T) if(error) *error |= 1; \
+        fprintf(stderr, T); \
+        free(r.data); \
+        arena_free(arena); \
+        return (PublicKey){0};
+
     if(node->kind != DER_SEQUENCE) {
-        if(error) *error |= 1;
-        fprintf(stderr, "Invalid format, expected sequence\n");
-        free(r.data);
-        arena_free(arena);
-        return (PublicKey){0};
+        FATAL_PEM_PUBLIC("Invalid format, expected DER sequence\n");
     }
 
-    // TODO(psv): check if the correct key format is provided
-    // Ignore node->sequence.data for now,
-    // it is the information about which key it is
+    DER_Node** seq = node->sequence.data;
 
-    if(!node->next || node->next->kind != DER_BIT_STRING) {
-        // error
-        if(error) *error |= 1;
-        fprintf(stderr, "Invalid format, expected bit string\n");
-        free(r.data);
-        arena_free(arena);
-        return (PublicKey){0};
+    if(array_length(seq) < 2 || seq[0]->kind != DER_SEQUENCE || array_length(seq[0]->sequence.data) < 2) {
+        FATAL_PEM_PUBLIC("Invalid format, Sequence must contain OID and Key information\n");
     }
 
-    if(node->next->bit_string.data->kind != DER_SEQUENCE) {
-        if(error) *error |= 1;
-        fprintf(stderr, "Invalid format, expected sequence of two integers\n");
-        free(r.data);
-        arena_free(arena);
-        return (PublicKey){0};
+    DER_Node* oid = seq[0]->sequence.data[0];
+    if(oid->kind != DER_OBJECT_ID || seq[0]->sequence.data[1]->kind != DER_NULL) {
+        FATAL_PEM_PUBLIC("Invalid format, expected OID followed by NULL\n");
+    }
+    
+    Signature_Algorithm alg = signature_algorithm_from_oid(oid->object_id);
+    
+    if(alg != Sig_RSA) {
+        FATAL_PEM_PUBLIC("Invalid format, unsupported encryption format\n");
     }
 
-    DER_Node* modulus = node->next->bit_string.data->sequence.data;
-    if(modulus->kind != DER_INTEGER) {
-        if(error) *error |= 1;
-        fprintf(stderr, "Invalid format, expected public modulus integer\n");
-        free(r.data);
-        arena_free(arena);
-        return (PublicKey){0};
+    if(seq[1]->kind != DER_BIT_STRING || seq[1]->bit_string.data->kind != DER_SEQUENCE) {
+        FATAL_PEM_PUBLIC("Invalid format, expected sequence in bit string\n");
     }
-
-    DER_Node* exponent = node->next->bit_string.data->next;
-    if(exponent->kind != DER_INTEGER) {
-        if(error) *error |= 1;
-        fprintf(stderr, "Invalid format, expected public exponent integer\n");
-        free(r.data);
-        arena_free(arena);
-        return (PublicKey){0};
+    DER_Node** values = seq[1]->bit_string.data->sequence.data;
+    if(array_length(values) < 2 || values[0]->kind != DER_INTEGER || values[1]->kind != DER_INTEGER) {
+        FATAL_PEM_PUBLIC("Invalid format, could not find modulus and exponent in bit string\n");
     }
-
-    pk.E = exponent->integer.i;
-    pk.N = modulus->integer.i;
+    pk.N = values[0]->integer.i;
+    pk.E = values[1]->integer.i;
 
     free(r.data);
     arena_free(arena);
@@ -580,7 +546,114 @@ asn1_parse_public_key(const u8* data, int length, u32* error) {
     return result;
 }
 
-void
+#define FATAL_CERTIFICATE_PEM(X) if(error) *error |= 1; \
+    fprintf(stderr, X); \
+    free(r.data); \
+    arena_free(arena); \
+    return (RSA_Certificate){0}
+
+static Signature_Algorithm
+signature_algorithm_from_oid(DER_Object_ID oid) {
+    // All asn1 signatures of known algorithms encoded as OID
+    static int oid_signature_RSA[]      = {1, 2, 840, 113549, 1, 1, 1};
+    static int oid_signature_MD2WithRSA[]      = {1, 2, 840, 113549, 1, 1, 2};
+    static int oid_signature_MD5WithRSA[]      = {1, 2, 840, 113549, 1, 1, 4};
+    static int oid_signature_SHA1WithRSA[]     = {1, 2, 840, 113549, 1, 1, 5};
+    static int oid_signature_SHA256WithRSA[]   = {1, 2, 840, 113549, 1, 1, 11};
+    static int oid_signature_SHA384WithRSA[]   = {1, 2, 840, 113549, 1, 1, 12};
+    static int oid_signature_SHA512WithRSA[]   = {1, 2, 840, 113549, 1, 1, 13};
+    static int oid_signature_RSAPSS[]          = {1, 2, 840, 113549, 1, 1, 10};
+    static int oid_signature_DSAWithSHA1[]     = {1, 2, 840, 10040, 4, 3};
+    static int oid_signature_DSAWithSHA256[]   = {2, 16, 840, 1, 101, 3, 4, 3, 2};
+    static int oid_signature_ECDSAWithSHA1[]   = {1, 2, 840, 10045, 4, 1};
+    static int oid_signature_ECDSAWithSHA256[] = {1, 2, 840, 10045, 4, 3, 2};
+    static int oid_signature_ECDSAWithSHA384[] = {1, 2, 840, 10045, 4, 3, 3};
+    static int oid_signature_ECDSAWithSHA512[] = {1, 2, 840, 10045, 4, 3, 4};
+
+    int length_bytes = oid.length * sizeof(int);
+
+    #define OID_EQUAL(A, S) if(length_bytes == sizeof(A) && memcmp(oid.data, A, length_bytes) == 0) return S
+
+    OID_EQUAL(oid_signature_RSA, Sig_RSA);
+    OID_EQUAL(oid_signature_SHA1WithRSA, Sig_SHA1WithRSA);
+    OID_EQUAL(oid_signature_SHA256WithRSA, Sig_SHA256WithRSA);
+    OID_EQUAL(oid_signature_SHA384WithRSA, Sig_SHA384WithRSA);
+    OID_EQUAL(oid_signature_SHA512WithRSA, Sig_SHA512WithRSA);
+    OID_EQUAL(oid_signature_RSAPSS, Sig_RSAPSS);
+    OID_EQUAL(oid_signature_DSAWithSHA1, Sig_DSAWithSHA1);
+    OID_EQUAL(oid_signature_DSAWithSHA256, Sig_DSAWithSHA256);
+    OID_EQUAL(oid_signature_ECDSAWithSHA1, Sig_ECDSAWithSHA1);
+    OID_EQUAL(oid_signature_ECDSAWithSHA256, Sig_ECDSAWithSHA256);
+    OID_EQUAL(oid_signature_ECDSAWithSHA384, Sig_ECDSAWithSHA384);
+    OID_EQUAL(oid_signature_ECDSAWithSHA512, Sig_ECDSAWithSHA512);
+    OID_EQUAL(oid_signature_MD2WithRSA, Sig_MD2WithRSA);
+    OID_EQUAL(oid_signature_MD5WithRSA, Sig_MD5WithRSA);
+
+    #undef OID_EQUAL
+    return -1;
+}
+
+static void 
+metadata_from_object_id(RSA_Certificate* certificate, DER_Object_ID oid, Cert_Metadata str) {
+    int length_bytes = oid.length * sizeof(int);
+
+    // Reference: https://www.alvestrand.no/objectid/2.5.4.html
+    static int attribute_types[] = {2, 5, 4};
+    static int pkcs9_signatures[] = {1, 2, 840, 113549, 1, 9};
+
+    #define  oid_aliased_entry_name 1
+    #define  oid_common_name 3
+    #define  oid_country_name 6
+    #define  oid_state_name 8
+    #define  oid_locality_name 7
+    #define  oid_organization_name 10
+    #define  oid_organization_unit_name 11
+
+    #define oid_email_address 1
+
+    switch(oid.length) {
+        case 4:
+        {
+            if(memcmp(attribute_types, oid.data, sizeof(int) * 3) == 0) {
+                // attribute types
+                switch(oid.data[3]) {
+                    case oid_aliased_entry_name:
+                    case oid_organization_unit_name:
+                    default: break;
+
+                    case oid_common_name:
+                        certificate->common_name = str;
+                        break;
+                    case oid_country_name:
+                        certificate->country = str;
+                        break;
+                    case oid_locality_name:
+                        certificate->locality = str;
+                        break;
+                    case oid_organization_name:
+                        certificate->organization = str;
+                        break;
+                    case oid_state_name:
+                        certificate->state = str;
+                        break;
+                }
+            }
+        }break;
+        case 7:
+        {
+            // email supported
+            // https://www.alvestrand.no/objectid/1.2.840.113549.1.9.html
+            if(memcmp(pkcs9_signatures, oid.data, sizeof(int) * 6) == 0 && oid.data[6] == oid_email_address) {
+                certificate->email = str;
+                return;
+            }
+        }break;
+        default: // unsupported
+        break;
+    }
+}
+
+RSA_Certificate
 asn1_parse_pem_certificate(const u8* data, int length, u32* error) {
     Base64_Data r = base64_decode(data, length);
     if(r.error != 0) {
@@ -591,9 +664,82 @@ asn1_parse_pem_certificate(const u8* data, int length, u32* error) {
 
     Light_Arena* arena = arena_create(65535);
     DER_Node* node = parse_der(arena, r.data, r.length, error);
-    PublicKey pk = {0};
 
+    RSA_Certificate certificate = {0};
 
+    DER_Node* at = node;
+    if(node->kind != DER_SEQUENCE) {
+        FATAL_CERTIFICATE_PEM("Could not parse PEM certificate, expected DER sequence\n");
+    }
+
+    at = at->sequence.data[0];
+    if(!at || at->kind != DER_SEQUENCE) {
+        FATAL_CERTIFICATE_PEM("Could not parse PEM certificate, expected DER sequence\n");
+    }
+
+    for(int i = 0; i < array_length(at->sequence.data); ++i) {
+        // each entry
+        DER_Node* node = at->sequence.data[i];
+        switch(node->kind) {
+            case DER_INTEGER: {
+                // Serial number
+                certificate.serial_number = node->integer.i;
+            } break;
+            case DER_SEQUENCE: {
+                for(int j = 0; j < array_length(node->sequence.data); ++j) {
+                    DER_Node* metadata = node->sequence.data[j];
+                    if(metadata->kind == DER_BIT_STRING) {
+                        // Public Key
+                        if(!metadata->bit_string.data || metadata->bit_string.data->kind != DER_SEQUENCE) {
+                            FATAL_CERTIFICATE_PEM("Fail to parse PEM metadata, could not find Public Key integer\n");
+                        }
+                        DER_Node** seq = metadata->bit_string.data->sequence.data;
+                        if(array_length(seq) != 2 || seq[0]->kind != DER_INTEGER || seq[1]->kind != DER_INTEGER) {
+                            FATAL_CERTIFICATE_PEM("Fail to parse PEM metadata, Public Key does not contain exponent and modulus\n");
+                        }
+                        certificate.public_key.N = seq[0]->integer.i;
+                        certificate.public_key.E = seq[1]->integer.i;
+                    } else if(metadata->kind == DER_OBJECT_ID) {
+                        // type of signature
+                        certificate.signature_algorithm = signature_algorithm_from_oid(metadata->object_id);
+                    } else if(metadata->kind == DER_SET) {
+                        DER_Node* m = metadata->set.data;
+                        if(m->kind != DER_SEQUENCE) {
+                            FATAL_CERTIFICATE_PEM("Fail to parse PEM metadata, expecting DER sequence\n");
+                        }
+                        // Always OID and (PRINTABLE_STRING | UTF8_STRING)
+                        DER_Node** sq = m->sequence.data;
+                        if(array_length(sq) != 2 || sq[0]->kind != DER_OBJECT_ID) {
+                            FATAL_CERTIFICATE_PEM("Fail to parse PEM metadata, expecting sequence of OID and string\n");
+                        }
+                        // OID
+                        DER_Object_ID oid = sq[0]->object_id;
+                        DER_Node* str = sq[1];
+                        Cert_Metadata s = {0};
+                        if(str->kind == DER_PRINTABLE_STRING || str->kind == DER_IA5_STRING) {
+                            s = (Cert_Metadata){str->printable_string.length, str->printable_string.data};
+                        } else if(str->kind == DER_UTF8_STRING) {
+                            s = (Cert_Metadata){str->utf8_string.length, str->utf8_string.data};
+                        } else {
+                            FATAL_CERTIFICATE_PEM("Fail to parse PEM metadata, metadata OID must be followed by a string\n");
+                        }
+                        metadata_from_object_id(&certificate, oid, s);
+                    } else if(metadata->kind == DER_SEQUENCE) {
+                        // OID and Key Type
+                        DER_Node** key = metadata->sequence.data;
+                        if(array_length(key) != 2 || key[0]->kind != DER_OBJECT_ID) {
+                            FATAL_CERTIFICATE_PEM("Fail to parse PEM metadata, Key type must be OID + NULL\n");
+                        }
+                        certificate.type = signature_algorithm_from_oid(key[0]->object_id);
+                    }
+                }
+            } break;
+            default: {
+
+            } break;
+        }
+    }
+    return certificate;
 }
 
 static void*
