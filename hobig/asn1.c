@@ -374,13 +374,19 @@ private_key_free(PrivateKey p) {
 // Reference:
 // https://crypto.stackexchange.com/questions/21102/what-is-the-ssl-private-key-file-format
 PrivateKey
-asn1_parse_pem_private(const u8* data, int length, u32* error) {
-    Base64_Data r = base64_decode(data, length);
-    if(r.error != 0) {
-        fprintf(stderr, "Could not parse key base64 data\n");
-        free(r.data);
-        if(error) *error |= 1;
-        return (PrivateKey){0};
+asn1_parse_pem_private(const u8* data, int length, u32* error, int is_base64_encoded) {
+    Base64_Data r = {0};
+    if(is_base64_encoded) {
+        r = base64_decode(data, length);
+        if(r.error != 0) {
+            fprintf(stderr, "Could not parse key base64 data\n");
+            free(r.data);
+            if(error) *error |= 1;
+            return (PrivateKey){0};
+        }
+    } else {
+        r.data = (char*)data;
+        r.length = length;
     }
 
     Light_Arena* arena = arena_create(65535);
@@ -389,7 +395,7 @@ asn1_parse_pem_private(const u8* data, int length, u32* error) {
 
     #define FATAL_PEM_PRIVATE(T) if(error) *error |= 1; \
         fprintf(stderr, T); \
-        free(r.data); \
+        if(is_base64_encoded) free(r.data); \
         arena_free(arena); \
         private_key_free(key); \
         return (PrivateKey){0};
@@ -436,13 +442,20 @@ static Signature_Algorithm signature_algorithm_from_oid(DER_Object_ID oid);
 // Parses PEM file of a public key
 // Reference: https://medium.com/@bn121rajesh/understanding-rsa-public-key-70d900b1033c
 PublicKey
-asn1_parse_pem_public(const u8* data, int length, u32* error) {
-    Base64_Data r = base64_decode(data, length);
-    if(r.error != 0) {
-        fprintf(stderr, "Could not parse key base64 data\n");
-        free(r.data);
-        if(error) *error |= 1;
-        return (PublicKey){0};
+asn1_parse_pem_public(const u8* data, int length, u32* error, int is_base64_encoded) {
+    Base64_Data r = {0};
+    
+    if(is_base64_encoded) {
+        r = base64_decode(data, length);
+        if(r.error != 0) {
+            fprintf(stderr, "Could not parse key base64 data\n");
+            free(r.data);
+            if(error) *error |= 1;
+            return (PublicKey){0};
+        }
+    } else {
+        r.data = (char*)data;
+        r.length = length;
     }
 
     Light_Arena* arena = arena_create(65535);
@@ -451,7 +464,7 @@ asn1_parse_pem_public(const u8* data, int length, u32* error) {
 
     #define FATAL_PEM_PUBLIC(T) if(error) *error |= 1; \
         fprintf(stderr, T); \
-        free(r.data); \
+        if(is_base64_encoded) free(r.data); \
         arena_free(arena); \
         return (PublicKey){0};
 
@@ -492,11 +505,18 @@ asn1_parse_pem_public(const u8* data, int length, u32* error) {
 }
 
 PublicKey
-asn1_parse_public_key(const u8* data, int length, u32* error) {
-    Base64_Data r = base64_decode(data, length);
-    if(r.error != 0) {
-        fprintf(stderr, "Could not parse key base64 data\n");
-        if(error) *error |= 1;
+asn1_parse_public_key(const u8* data, int length, u32* error, int is_base64_encoded) {
+    Base64_Data r = {0};
+
+    if(is_base64_encoded) {
+        r = base64_decode(data, length);
+        if(r.error != 0) {
+            fprintf(stderr, "Could not parse key base64 data\n");
+            if(error) *error |= 1;
+        }
+    } else {
+        r.data = (char*)data;
+        r.length = length;
     }
 
     char* at = r.data;
@@ -548,7 +568,7 @@ asn1_parse_public_key(const u8* data, int length, u32* error) {
 
 #define FATAL_CERTIFICATE_PEM(X) if(error) *error |= 1; \
     fprintf(stderr, X); \
-    free(r.data); \
+    if(is_base64_encoded) free(r.data); \
     arena_free(arena); \
     return (RSA_Certificate){0}
 
@@ -654,12 +674,19 @@ metadata_from_object_id(RSA_Certificate* certificate, DER_Object_ID oid, Cert_Me
 }
 
 RSA_Certificate
-asn1_parse_pem_certificate(const u8* data, int length, u32* error) {
-    Base64_Data r = base64_decode(data, length);
-    if(r.error != 0) {
-        fprintf(stderr, "Could not parse key base64 data\n");
-        free(r.data);
-        if(error) *error |= 1;
+asn1_parse_pem_certificate(const u8* data, int length, u32* error, int is_base64_encoded) {
+    Base64_Data r = {0};
+
+    if(is_base64_encoded) {
+        r = base64_decode(data, length);
+        if(r.error != 0) {
+            fprintf(stderr, "Could not parse key base64 data\n");
+            free(r.data);
+            if(error) *error |= 1;
+        }
+    } else {
+        r.data = (char*)data;
+        r.length = length;
     }
 
     Light_Arena* arena = arena_create(65535);
@@ -803,7 +830,7 @@ asn1_parse_public_key_from_file(const char* filename, int* error) {
 
     char* start_data = at;
     while(!is_whitespace(*at)) { at++; at_index++; }
-    PublicKey pubk = asn1_parse_public_key(start_data, at - start_data, error);
+    PublicKey pubk = asn1_parse_public_key(start_data, at - start_data, error, 1);
 
     // email may follow but we ignore it
 
@@ -858,7 +885,7 @@ asn1_parse_pem_public_key_from_file(const char* filename, int* error) {
         }
     }
 
-    PublicKey result = asn1_parse_pem_public(d, trimmed_length, error);
+    PublicKey result = asn1_parse_pem_public(d, trimmed_length, error, 1);
 
     return result;
 }
@@ -911,7 +938,7 @@ asn1_parse_pem_private_key_from_file(const char* filename, int* error) {
         }
     }
 
-    PrivateKey result = asn1_parse_pem_private(d, trimmed_length, error);
+    PrivateKey result = asn1_parse_pem_private(d, trimmed_length, error, 1);
 
     return result;
 }
@@ -965,7 +992,7 @@ asn1_parse_pem_certificate_from_file(const char* filename, int* error) {
         }
     }
 
-    RSA_Certificate result = asn1_parse_pem_certificate(d, trimmed_length, error);
+    RSA_Certificate result = asn1_parse_pem_certificate(d, trimmed_length, error, 1);
 
     return result;
 }

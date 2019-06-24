@@ -60,16 +60,16 @@ PublicKey  asn1_parse_pem_public_key_from_file(const char* filename, int* error)
 PrivateKey asn1_parse_pem_private_key_from_file(const char* filename, int* error);
 RSA_Certificate asn1_parse_pem_certificate_from_file(const char* filename, int* error);
 
-RSA_Certificate asn1_parse_pem_certificate(const unsigned char* data, int length, unsigned int* error);
+RSA_Certificate asn1_parse_pem_certificate(const unsigned char* data, int length, unsigned int* error, int is_base64_encoded);
 
 // Public Key in the format of openssl
-PublicKey asn1_parse_public_key(const unsigned char* data, int length, unsigned int* error);
+PublicKey asn1_parse_public_key(const unsigned char* data, int length, unsigned int* error, int is_base64_encoded);
 
 // Public Key in the PEM format
-PublicKey asn1_parse_pem_public(const unsigned char* data, int length, unsigned int* error);
+PublicKey asn1_parse_pem_public(const unsigned char* data, int length, unsigned int* error, int is_base64_encoded);
 
 // Private Key in the PEM format
-PrivateKey asn1_parse_pem_private(const unsigned char* data, int length, unsigned int* error);
+PrivateKey asn1_parse_pem_private(const unsigned char* data, int length, unsigned int* error, int is_base64_encoded);
 
 // Free functions
 void public_key_free(PublicKey p);
