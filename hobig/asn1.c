@@ -915,3 +915,57 @@ asn1_parse_pem_private_key_from_file(const char* filename, int* error) {
 
     return result;
 }
+
+RSA_Certificate 
+asn1_parse_pem_certificate_from_file(const char* filename, int* error) {
+    //-----BEGIN CERTIFICATE-----
+    int file_size = 0;
+    void* memory = load_entire_file(filename, &file_size);
+    if(!memory) { if(error) *error |= 1; return (RSA_Certificate){0}; };
+
+    // File contents are loaded
+    char* at = memory;
+    int at_index = 0;
+
+    while(is_whitespace(*at)) { at++; at_index++; }
+    if((file_size - at_index < sizeof("-----BEGIN CERTIFICATE-----") - 1) ||
+        strncmp("-----BEGIN CERTIFICATE-----", at, sizeof("-----BEGIN CERTIFICATE-----") - 1) != 0) 
+    {
+        // File is not large enough or pattern not found
+        free(memory);
+        fprintf(stderr, "File format invalid, expected -----BEGIN CERTIFICATE-----\n");
+        return (RSA_Certificate){0};
+    }
+
+    at += sizeof("-----BEGIN CERTIFICATE-----") - 1;
+    while(is_whitespace(*at)) { at++; at_index++; }
+
+    char* start_data = at;
+    while(*at != '-') { at++; at_index++; }
+    int data_bytes = at - start_data;
+    char* d = calloc(1, data_bytes + 1);
+
+    // -----END CERTIFICATE----- follows
+    if((file_size - at_index < sizeof("-----END CERTIFICATE-----") - 1) ||
+        strncmp("-----END CERTIFICATE-----", at, sizeof("-----END CERTIFICATE-----") - 1) != 0) 
+    {
+        // File is not large enough or pattern not found
+        free(d);
+        free(memory);
+        fprintf(stderr, "File format invalid, expected -----END CERTIFICATE-----\n");
+        return (RSA_Certificate){0};
+    }
+
+    at = start_data;
+    int trimmed_length = 0;
+    for(int i = 0, k = 0; i < data_bytes; ++i, at++) {
+        if(!is_whitespace(*at)) {
+            d[k++] = *at;
+            trimmed_length++;
+        }
+    }
+
+    RSA_Certificate result = asn1_parse_pem_certificate(d, trimmed_length, error);
+
+    return result;
+}

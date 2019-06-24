@@ -48,10 +48,11 @@ void test_pem_public() {
 int main(int argc, char** argv) {
     unsigned int error = 0;
 
-    test_pem_public();
+    //test_pem_public();
     //test_pem_private();
     //test_pem_cert();
 
+    RSA_Certificate cert = asn1_parse_pem_certificate_from_file("/home/hoshoyo/test/cert.pem", &error);
 #if 0
     PublicKey key0 = asn1_parse_public_key_from_file("/home/hoshoyo/.ssh/id_rsa.pub", &error);
     PublicKey key1 = asn1_parse_pem_public_key_from_file("/home/hoshoyo/test/public.pem", &error);

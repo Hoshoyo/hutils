@@ -58,7 +58,7 @@ typedef struct {
 PublicKey  asn1_parse_public_key_from_file(const char* filename, int* error);
 PublicKey  asn1_parse_pem_public_key_from_file(const char* filename, int* error);
 PrivateKey asn1_parse_pem_private_key_from_file(const char* filename, int* error);
-
+RSA_Certificate asn1_parse_pem_certificate_from_file(const char* filename, int* error);
 
 RSA_Certificate asn1_parse_pem_certificate(const unsigned char* data, int length, unsigned int* error);
 
