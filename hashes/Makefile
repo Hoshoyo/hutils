@@ -1,2 +1,2 @@
 all:
-	gcc -g hhashes.c
+	gcc -g hhashes.c hmac.c
