@@ -43,10 +43,24 @@ hmac_sha1(char* key, int key_length, char* message, int message_length, char res
     free(m);
 }
 
+void test_sha1() {
+    char res[20] = {0};
+    char in[256] = {0};
+    for(int j = 0; j < 256; ++j) {
+        in[j] = '6';
+    }
+    
+    for(int i = 0; i < 256; ++i) {
+        sha1(in, i, res);
+        sha1_print(res);
+        printf("\n");
+    }
+}
+
 int main() {
     char res[20] = {0};
-    hmac_sha1("", 0, "", 0, res);
-    //sha1("abc", 3, res);
+    test_sha1();
+    //hmac_sha1("", 0, "", 0, res);
     sha1_print(res);
     return 0;
 }

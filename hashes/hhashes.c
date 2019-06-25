@@ -191,12 +191,11 @@ sha1(char* buffer, int length, char out[20]) {
     uint32_t digest[5] = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0};
     uint32_t block[16] = {0};
 
-    uint64_t transforms = 0;
     uint64_t total_bits = length * 8;
 
     // for each 64 bit chunk do
     for(int i = 0; i < length / 64; ++i) {
-        buffer_to_block(buffer, length, block);
+        buffer_to_block(buffer, 64, block);
         transform(digest, block);
         buffer += 64;
     }
@@ -212,16 +211,16 @@ sha1(char* buffer, int length, char out[20]) {
 
     if(n > 56) {
         // there is no more space to put the length
-        buffer_to_block(last_buffer, length, block);
+        buffer_to_block(last_buffer, n, block);
         transform(digest, block);
         memset(last_buffer, 0, 64);
-        buffer_to_block(last_buffer, length, block);
+        buffer_to_block(last_buffer, n, block);
         block[BLOCK_INTS - 1] = (uint32_t)total_bits;
         block[BLOCK_INTS - 2] = (uint32_t)(total_bits >> 32);
         transform(digest, block);
     } else {
         // there is still space
-        buffer_to_block(last_buffer, length, block);
+        buffer_to_block(last_buffer, n, block);
 
         block[BLOCK_INTS - 1] = (uint32_t)total_bits;
         block[BLOCK_INTS - 2] = (uint32_t)(total_bits >> 32);
@@ -233,4 +232,4 @@ sha1(char* buffer, int length, char out[20]) {
     ((uint32_t*)out)[2] = BIG_ENDIAN_32(digest[2]);
     ((uint32_t*)out)[3] = BIG_ENDIAN_32(digest[3]);
     ((uint32_t*)out)[4] = BIG_ENDIAN_32(digest[4]);
-}
+}   
