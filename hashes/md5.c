@@ -155,9 +155,6 @@ void test_md5() {
     }
     
     for(int i = 0; i < 256; ++i) {
-        if(i == 64) {
-            int xx = 0;
-        }
         md5(in, i, res);
         printf("%d ", i);
         md5_print(res);

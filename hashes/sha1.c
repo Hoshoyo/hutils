@@ -232,4 +232,4 @@ sha1(char* buffer, int length, char out[20]) {
     ((uint32_t*)out)[2] = BIG_ENDIAN_32(digest[2]);
     ((uint32_t*)out)[3] = BIG_ENDIAN_32(digest[3]);
     ((uint32_t*)out)[4] = BIG_ENDIAN_32(digest[4]);
-}   
+}
