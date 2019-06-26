@@ -10,6 +10,7 @@
 #define BLOCK_BYTES (16 * 4)
 #define DIGEST_SIZE 5
 #define MAX(A, B) ((A > B) ? (A) : (B))
+#define MIN(A, B) ((A < B) ? (A) : (B))
 
 void
 hmac_sha1(char* key, int key_length, char* message, int message_length, char result[20]) {
@@ -18,7 +19,7 @@ hmac_sha1(char* key, int key_length, char* message, int message_length, char res
     char i_key_pad[HMAC_BLOCK_SIZE] = {0};
 
     if(key_length > HMAC_BLOCK_SIZE) {
-        // TODO
+        sha1(key, key_length, temp_key);
     }
     if(key_length < HMAC_BLOCK_SIZE) {
         memcpy(temp_key, key, key_length);
@@ -43,6 +44,36 @@ hmac_sha1(char* key, int key_length, char* message, int message_length, char res
     free(m);
 }
 
+void phash_sha1(char* secret, int secret_length, char* seed, int seed_length, char* result, int result_length_bytes) {
+    int length = result_length_bytes;
+    const int hash_length = 20;
+    char A[20] = {0};
+    char T[20] = {0};
+
+    // Calculate A(1) = hmac(secret, A(0))
+    hmac_sha1(secret, secret_length, seed, seed_length, A);
+
+    if(length == 0) return;
+    char* temp = calloc(1, hash_length + seed_length);
+
+    int offset = 0;
+    while(length > 0) {
+        // Next A
+        memcpy(temp, A, hash_length);
+        memcpy(temp + hash_length, seed, seed_length);
+
+        hmac_sha1(secret, secret_length, temp, hash_length + seed_length, T);
+        int a = MIN(length, hash_length);
+        memcpy(result + offset, T, a);
+        length -= a;
+        offset += a;
+
+        hmac_sha1(secret, secret_length, A, hash_length, A);
+    }
+
+    free(temp);
+}
+
 void test_sha1() {
     char res[20] = {0};
     char in[256] = {0};
@@ -57,10 +88,27 @@ void test_sha1() {
     }
 }
 
-int main() {
+void test_hmac_sha1() {
     char res[20] = {0};
-    test_sha1();
-    //hmac_sha1("", 0, "", 0, res);
+    hmac_sha1(
+        "gigantic key which shall not be passed as an argument to any function", sizeof("gigantic key which shall not be passed as an argument to any function") - 1, 
+        "The quick brown fox jumps over the lazy dog", sizeof("The quick brown fox jumps over the lazy dog") - 1, res);
     sha1_print(res);
+}
+
+void test_phash_sha1() {
+    #define RES_LENGTH 200
+    char res[RES_LENGTH] = {0};
+    phash_sha1("hello", 5, "world", 5, res, RES_LENGTH);
+    
+    for(int i = 0; i < RES_LENGTH; ++i) {
+        if(i != 0) printf(", ");
+        printf("%d", (unsigned char)res[i]);
+    }
+}
+
+int main() {
+    test_phash_sha1();
+
     return 0;
 }
