@@ -98,7 +98,7 @@ void md5(char* buffer, int length, char out[16]) {
 
     // for each 64 bit chunk do
     for(int i = 0; i < length / 64; ++i) {
-        buffer_to_block(buffer, block);
+        memcpy(block, buffer, 64);
         transform(digest, block);
         buffer += 64;
     }
@@ -151,10 +151,13 @@ void test_md5() {
     char res[16] = {0};
     char in[256] = {0};
     for(int j = 0; j < 256; ++j) {
-        in[j] = '6';
+        in[j] = j;//'6';
     }
     
     for(int i = 0; i < 256; ++i) {
+        if(i == 64) {
+            int xx = 0;
+        }
         md5(in, i, res);
         printf("%d ", i);
         md5_print(res);
@@ -162,6 +165,7 @@ void test_md5() {
     }
 }
 
+#if 0
 int main() {
     //char res[16] = {0};
     //md5("abc", 3, res);
@@ -171,3 +175,5 @@ int main() {
 
     return 0;
 }
+
+#endif
