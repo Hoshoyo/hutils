@@ -10,8 +10,8 @@ static void
 buffer_to_block(char* buffer, int length, uint32_t block[16]) {
     for (uint64_t i = 0; i < BLOCK_INTS; i += 1) {
         block[i] = ((uint32_t)(buffer[4*i+3] & 0xff) | ((uint32_t)(buffer[4*i+2] & 0xff)<<8)
-                   | ((uint32_t)(buffer[4*i+1] & 0xff)<<16)
-                   | ((uint32_t)(buffer[4*i+0] & 0xff)<<24));
+            | ((uint32_t)(buffer[4*i+1] & 0xff)<<16)
+            | ((uint32_t)(buffer[4*i+0] & 0xff)<<24));
     }
 }
 

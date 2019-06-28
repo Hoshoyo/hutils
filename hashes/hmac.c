@@ -47,53 +47,108 @@ hmac(
     free(m);
 }
 
-#if 0
-void phash_sha1(char* secret, int secret_length, char* seed, int seed_length, char* result, int result_length_bytes) {
+// prf12 implements the TLS 1.2 pseudo-random function, as defined in RFC 5246, Section 5.
+void prf12(void(*hash_function)(char*, int, char*), 
+    int hash_result_length,
+    const char* secret, int secret_length,
+    const char* label, int label_length,
+    const char* seed, int seed_length,
+    char* result, int result_length) 
+{
+    int label_and_seed_length = label_length + seed_length;
+    char* label_and_seed = calloc(1, label_and_seed_length);
+
+    memcpy(label_and_seed, label, label_length);
+    memcpy(label_and_seed + label_length, seed, seed_length);
+
+    phash(hash_function, hash_result_length, secret, secret_length, seed, seed_length, result, result_length);
+}
+
+void prf10(
+    const char* secret, int secret_length, 
+    const char* label, int label_length, 
+    const char* seed, int seed_length,
+    char* result, int result_length) 
+{
+    const int MD5_RESULT_LENGTH = 16;
+    const int SHA1_RESULT_LENGTH = 20;
+
+    int label_and_seed_length = label_length + seed_length;
+    char* label_and_seed = calloc(1, label_and_seed_length);
+    memcpy(label_and_seed, label, label_length);
+    memcpy(label_and_seed + label_length, seed, seed_length);
+
+    int s1_len = (secret_length + 1) / 2;
+    int s2_len = secret_length - (secret_length / 2);
+    char* s1 = calloc(1, s1_len);
+	char* s2 = calloc(1, s2_len);
+
+    memcpy(s1, secret, s1_len);
+    memcpy(s2, secret + s1_len, s2_len);
+
+    phash(md5, MD5_RESULT_LENGTH, s1,  s1_len, label_and_seed, label_and_seed_length, result, result_length);
+
+    char* res_temp = calloc(1, result_length);
+	phash(sha1, SHA1_RESULT_LENGTH, s2, s2_len, label_and_seed, label_and_seed_length, res_temp, result_length);
+
+	for (int i = 0; i < result_length; ++i) {
+        result[i] ^= res_temp[i];
+	}
+
+    free(s1);
+    free(s2);
+    free(label_and_seed);
+    free(res_temp);
+}
+
+void phash(
+    void(*hash_function)(char*, int, char*), int hash_result_length_bytes,
+    char* secret, int secret_length, char* seed, int seed_length, char* result, int result_length_bytes) 
+{
     int length = result_length_bytes;
-    const int hash_length = 20;
-    char A[20] = {0};
-    char T[20] = {0};
+    char A[512] = {0};
+    char T[512] = {0};
 
     // Calculate A(1) = hmac(secret, A(0))
-    hmac_sha1(secret, secret_length, seed, seed_length, A);
+    hmac(hash_function, secret, secret_length, seed, seed_length, A, hash_result_length_bytes);
 
     if(length == 0) return;
-    char* temp = calloc(1, hash_length + seed_length);
-    memcpy(temp + hash_length, seed, secret_length);
+    char* temp = calloc(1, hash_result_length_bytes + seed_length);
+    memcpy(temp + hash_result_length_bytes, seed, secret_length);
 
     int offset = 0;
     while(length > 0) {
         // Next A
-        memcpy(temp, A, hash_length);
+        memcpy(temp, A, hash_result_length_bytes);
 
-        hmac_sha1(secret, secret_length, temp, hash_length + seed_length, T);
-        int a = MIN(length, hash_length);
+        hmac(hash_function, secret, secret_length, temp, hash_result_length_bytes + seed_length, T, hash_result_length_bytes);
+        int a = MIN(length, hash_result_length_bytes);
         memcpy(result + offset, T, a);
         length -= a;
         offset += a;
 
-        hmac_sha1(secret, secret_length, A, hash_length, A);
+        hmac(hash_function, secret, secret_length, A, hash_result_length_bytes, A, hash_result_length_bytes);
     }
 
     free(temp);
 }
-void test_phash_sha1() {
+
+void test_phash() {
     #define RES_LENGTH 200
     char res[RES_LENGTH] = {0};
-    phash_sha1("hello", 5, "world", 5, res, RES_LENGTH);
+    phash(sha1, 20, "hello", 5, "world", 5, res, RES_LENGTH);
     
     for(int i = 0; i < RES_LENGTH; ++i) {
         if(i != 0) printf(", ");
         printf("%d", (unsigned char)res[i]);
     }
 }
-#endif
 
 void test_sha1() {
     char res[20] = {0};
     char in[256] = {0};
     for(int j = 0; j < 256; ++j) {
-        in[j] = '6';
+        in[j] = j;
     }
     
     for(int i = 0; i < 256; ++i) {
@@ -103,26 +158,32 @@ void test_sha1() {
     }
 }
 
-void test_hmac_sha1() {
+void test_hmac() {
     char res[20] = {0};
-    //hmac_sha1(sha1, "", 0, "", 0, res, 20);
-    //hmac_sha1(
-    //    sha1,
-    //    "gigantic key which shall not be passed as an argument to any function", sizeof("gigantic key which shall not be passed as an argument to any function") - 1, 
-    //    "The quick brown fox jumps over the lazy dog", sizeof("The quick brown fox jumps over the lazy dog") - 1, res, 20);
-    //sha1_print(res);
-    //printf("\n");
+    hmac(sha1, "", 0, "", 0, res, 20);
+    sha1_print(res);
+    printf("\n");
+    hmac(
+        sha1,
+        "gigantic key which shall not be passed as an argument to any function", sizeof("gigantic key which shall not be passed as an argument to any function") - 1, 
+        "The quick brown fox jumps over the lazy dog", sizeof("The quick brown fox jumps over the lazy dog") - 1, res, 20);
+    sha1_print(res);
+    printf("\n");
     
-    hmac_sha1(md5, "", 0, "", 0, res, 16);
-    hmac_sha1(md5,
+    hmac(md5, "", 0, "", 0, res, 16);
+    md5_print(res);
+    printf("\n");
+
+    hmac(md5,
     "gigantic key which shall not be passed as an argument to any function", sizeof("gigantic key which shall not be passed as an argument to any function") - 1, 
         "The quick brown fox jumps over the lazy dog", sizeof("The quick brown fox jumps over the lazy dog") - 1, res, 16);
     md5_print(res);
+    printf("\n");
 }
 
 int main() {
-    //test_phash_sha1();
-    test_hmac_sha1();
+    //test_phash();
+    test_hmac();
 
     //char res[16] = {0};
     //md5("gigantic key which shall not be passed as an argument to any function", sizeof("gigantic key which shall not be passed as an argument to any function") - 1, res);

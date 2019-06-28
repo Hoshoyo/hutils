@@ -5,11 +5,8 @@
 
 #define BIG_ENDIAN_32(X) (((X) << 24) | (((X) << 8) & 0xff0000) | (((X) >> 8) & 0xff00) | ((X) >> 24))
 
-#define SHA256_DIGEST_SIZE 8
-
 #define ROL(a,b) (((a) << (b)) | ((a) >> (32-(b))))
 #define ROR(a,b) (((a) >> (b)) | ((a) << (32-(b))))
-
 #define CH(x,y,z) (((x) & (y)) ^ (~(x) & (z)))
 #define MAJ(x,y,z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
 #define EP0(x) (ROR(x,2) ^ ROR(x,13) ^ ROR(x,22))
@@ -17,7 +14,8 @@
 #define S0(x) (ROR(x,7) ^ ROR(x,18) ^ ((x) >> 3))
 #define S1(x) (ROR(x,17) ^ ROR(x,19) ^ ((x) >> 10))
 
-static uint32_t k[64] = {
+static uint32_t 
+sha256_k[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
     0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -29,15 +27,7 @@ static uint32_t k[64] = {
 };
 
 static void 
-buffer_to_block(char* buffer, int length, uint32_t block[16]) {
-    for (uint64_t i = 0; i < 16; i += 1) {
-        block[i] = ((uint32_t)(buffer[4*i+3] & 0xff) | ((uint32_t)(buffer[4*i+2] & 0xff)<<8)
-            | ((uint32_t)(buffer[4*i+1] & 0xff)<<16)
-            | ((uint32_t)(buffer[4*i+0] & 0xff)<<24));
-    }
-}
-
-static void transform(char* buffer, uint32_t digest[8], uint32_t ms[64]) {
+sha256_transform(char* buffer, uint32_t digest[8], uint32_t ms[64]) {
     for(int i = 0; i < 16; ++i) {
         ms[i] = BIG_ENDIAN_32(((uint32_t*)buffer)[i]);
     }
@@ -55,7 +45,7 @@ static void transform(char* buffer, uint32_t digest[8], uint32_t ms[64]) {
 	uint32_t h = digest[7];
 
     for (int i = 0; i < 64; ++i) {
-		uint32_t t1 = h + EP1(e) + CH(e,f,g) + k[i] + ms[i];
+		uint32_t t1 = h + EP1(e) + CH(e,f,g) + sha256_k[i] + ms[i];
 		uint32_t t2 = EP0(a) + MAJ(a,b,c);
 		h = g;
 		g = f;
@@ -89,7 +79,7 @@ sha256(char* buffer, int length, char out[24]) {
 
     // for each 64 bit chunk do
     for(int i = 0; i < length / 64; ++i) {
-        transform(buffer, digest, message_schedule);
+        sha256_transform(buffer, digest, message_schedule);
         buffer += 64;
     }
 
@@ -103,16 +93,16 @@ sha256(char* buffer, int length, char out[24]) {
 
     if(n > 56) {
         // there is no more space to put the length
-        transform(last_buffer, digest, message_schedule);
+        sha256_transform(last_buffer, digest, message_schedule);
         memset(last_buffer, 0, 64);
         ((uint32_t*)last_buffer)[16 - 1] = BIG_ENDIAN_32((uint32_t)total_bits);
         ((uint32_t*)last_buffer)[16 - 2] = BIG_ENDIAN_32((uint32_t)(total_bits >> 32));
-        transform(last_buffer, digest, message_schedule);
+        sha256_transform(last_buffer, digest, message_schedule);
     } else {
         // there is still space
         ((uint32_t*)last_buffer)[16 - 1] = BIG_ENDIAN_32((uint32_t)total_bits);
         ((uint32_t*)last_buffer)[16 - 2] = BIG_ENDIAN_32((uint32_t)(total_bits >> 32));
-        transform(last_buffer, digest, message_schedule);
+        sha256_transform(last_buffer, digest, message_schedule);
     }
 
     ((uint32_t*)out)[0] = BIG_ENDIAN_32(digest[0]);
@@ -140,35 +130,16 @@ u32_to_str_base16(uint32_t value, int leading_zeros, char* buffer)
 
 void 
 sha256_to_string(char in[32], char out[64]) {
+    const int SHA256_DIGEST_SIZE = 8;
     for (uint64_t i = 0; i < SHA256_DIGEST_SIZE; i += 1) {
         uint32_t v = ((uint32_t*)in)[i];
         u32_to_str_base16(BIG_ENDIAN_32(v), 1, (char*)out + (i * 8));
     }
 }
 
-void sha256_print(char in[32]) {
+void 
+sha256_print(char in[32]) {
     char r[64] = {0};
     sha256_to_string(in, r);
     printf("%.*s", 64, r);
-}
-
-void test_sha256() {
-    char res[32] = {0};
-    char buffer[256] = {0};
-    for(int i = 0; i < 256; ++i) {
-        buffer[i] = '6';
-    }
-
-    for(int i = 0; i < 256; ++i) {
-        sha256(buffer, i, res);
-        printf("%d ", i);
-        sha256_print(res);
-        printf("\n");
-    }
-}
-
-int main() {
-    test_sha256();
-
-    return 0;
 }
