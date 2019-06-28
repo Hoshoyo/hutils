@@ -7,7 +7,7 @@
 #define ROL(V, B) (((V) << (B)) | ((V) >> (32 - (B))))
 #define BLOCK_INTS 16
 
-void buffer_to_block(char* buffer, uint32_t block[16]) {
+void md5_buffer_to_block(char* buffer, uint32_t block[16]) {
     for (uint64_t i = 0; i < BLOCK_INTS; i += 1) {
         block[i] = ((uint32_t)(buffer[4*i+3] & 0xff) | ((uint32_t)(buffer[4*i+2] & 0xff)<<8)
                    | ((uint32_t)(buffer[4*i+1] & 0xff)<<16)
@@ -28,13 +28,13 @@ u32_to_str_base16(uint32_t value, int leading_zeros, char* buffer)
     return i;
 }
 
-static uint32_t r[64] = {
+static uint32_t md5_r[64] = {
     7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,  7, 12, 17, 22,
     5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,  5,  9, 14, 20,
     4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,  4, 11, 16, 23,
     6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21,  6, 10, 15, 21
 };
-static uint32_t k[] = {
+static uint32_t md5_k[] = {
     0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
     0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
     0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
@@ -53,7 +53,8 @@ static uint32_t k[] = {
     0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
 };
 
-void transform(uint32_t digest[4], uint32_t block[16]) {
+static void 
+md5_transform(uint32_t digest[4], uint32_t block[16]) {
     uint32_t A = digest[0];
     uint32_t B = digest[1];
     uint32_t C = digest[2];
@@ -76,11 +77,11 @@ void transform(uint32_t digest[4], uint32_t block[16]) {
             F = C ^ (B | (~D));
             g = (7 * i) % 16;
         }
-        F = F + A + k[i] + block[g];
+        F = F + A + md5_k[i] + block[g];
         uint32_t temp = D;
         D = C;
         C = B;
-        B = B + ROL(F, r[i]);
+        B = B + ROL(F, md5_r[i]);
         A = temp;
     }
     //Add this chunk's hash to result so far:
@@ -90,7 +91,8 @@ void transform(uint32_t digest[4], uint32_t block[16]) {
     digest[3] += D;
 }
 
-void md5(const char* buffer, int length, char out[16]) {
+void 
+md5(const char* buffer, int length, char out[16]) {
     uint32_t digest[] = { 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476 };
     uint32_t block[16] = {0};
 
@@ -99,7 +101,7 @@ void md5(const char* buffer, int length, char out[16]) {
     // for each 64 bit chunk do
     for(int i = 0; i < length / 64; ++i) {
         memcpy(block, buffer, 64);
-        transform(digest, block);
+        md5_transform(digest, block);
         buffer += 64;
     }
 
@@ -115,12 +117,12 @@ void md5(const char* buffer, int length, char out[16]) {
     if(n > 56) {
         // there is no more space to put the length
         memcpy(block, last_buffer, 64);
-        transform(digest, block);
+        md5_transform(digest, block);
         memset(last_buffer, 0, 64);
         memcpy(block, last_buffer, 64);
         block[BLOCK_INTS - 1] = (uint32_t)(total_bits >> 32);
         block[BLOCK_INTS - 2] = (uint32_t)(total_bits);
-        transform(digest, block);
+        md5_transform(digest, block);
     } else {
         // there is still space
         //buffer_to_block(last_buffer, block);
@@ -128,7 +130,7 @@ void md5(const char* buffer, int length, char out[16]) {
 
         block[BLOCK_INTS - 1] = (uint32_t)(total_bits >> 32);
         block[BLOCK_INTS - 2] = (uint32_t)(total_bits);
-        transform(digest, block);
+        md5_transform(digest, block);
     }
 
     ((uint32_t*)out)[0] = digest[0];
@@ -147,6 +149,15 @@ void md5_print(char in[16]) {
     }
 }
 
+void 
+md5_to_string(char in[16], char out[32]) {
+    const int MD5_DIGEST_SIZE = 4;
+    for (uint64_t i = 0; i < MD5_DIGEST_SIZE; i += 1) {
+        uint32_t v = ((uint32_t*)in)[i];
+        u32_to_str_base16(BIG_ENDIAN_32(v), 1, (char*)out + (i * 8));
+    }
+}
+
 void test_md5() {
     char res[16] = {0};
     char in[256] = {0};
@@ -161,16 +172,3 @@ void test_md5() {
         printf("\n");
     }
 }
-
-#if 0
-int main() {
-    //char res[16] = {0};
-    //md5("abc", 3, res);
-    //md5_print(res);
-
-    test_md5();
-
-    return 0;
-}
-
-#endif

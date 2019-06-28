@@ -2,13 +2,14 @@
 #include <stdio.h>
 #include <string.h>
 
-#define BLOCK_INTS (16)
+#define SHA1_BLOCK_INTS 16
 #define SHA1_BLOCK_SIZE_BYTES 64
 #define SHA1_DIGEST_SIZE 5
+#define BIG_ENDIAN_32(X) (((X) << 24) | (((X) << 8) & 0xff0000) | (((X) >> 8) & 0xff00) | ((X) >> 24))
 
 static void 
-buffer_to_block(const char* buffer, int length, uint32_t block[16]) {
-    for (uint64_t i = 0; i < BLOCK_INTS; i += 1) {
+sha1_buffer_to_block(const char* buffer, int length, uint32_t block[16]) {
+    for (uint64_t i = 0; i < SHA1_BLOCK_INTS; i += 1) {
         block[i] = ((uint32_t)(buffer[4*i+3] & 0xff) | ((uint32_t)(buffer[4*i+2] & 0xff)<<8)
             | ((uint32_t)(buffer[4*i+1] & 0xff)<<16)
             | ((uint32_t)(buffer[4*i+0] & 0xff)<<24));
@@ -28,7 +29,6 @@ u32_to_str_base16(uint32_t value, int leading_zeros, char* buffer)
     return i;
 }
 
-#define BIG_ENDIAN_32(X) (((X) << 24) | (((X) << 8) & 0xff0000) | (((X) >> 8) & 0xff00) | ((X) >> 24))
 void 
 sha1_to_string(char in[20], char out[40]) {
     for (uint64_t i = 0; i < SHA1_DIGEST_SIZE; i += 1) {
@@ -91,7 +91,7 @@ R4(uint32_t block[16], uint32_t v, uint32_t* w, uint32_t x, uint32_t y, uint32_t
 }
 
 static void 
-transform(uint32_t digest[5], uint32_t block[16]) {
+sha1_transform(uint32_t digest[5], uint32_t block[16]) {
     uint32_t a = digest[0];
     uint32_t b = digest[1];
     uint32_t c = digest[2];
@@ -195,8 +195,8 @@ sha1(const char* buffer, int length, char out[20]) {
 
     // for each 64 bit chunk do
     for(int i = 0; i < length / 64; ++i) {
-        buffer_to_block(buffer, 64, block);
-        transform(digest, block);
+        sha1_buffer_to_block(buffer, 64, block);
+        sha1_transform(digest, block);
         buffer += 64;
     }
 
@@ -211,20 +211,20 @@ sha1(const char* buffer, int length, char out[20]) {
 
     if(n > 56) {
         // there is no more space to put the length
-        buffer_to_block(last_buffer, n, block);
-        transform(digest, block);
+        sha1_buffer_to_block(last_buffer, n, block);
+        sha1_transform(digest, block);
         memset(last_buffer, 0, 64);
-        buffer_to_block(last_buffer, n, block);
-        block[BLOCK_INTS - 1] = (uint32_t)total_bits;
-        block[BLOCK_INTS - 2] = (uint32_t)(total_bits >> 32);
-        transform(digest, block);
+        sha1_buffer_to_block(last_buffer, n, block);
+        block[SHA1_BLOCK_INTS - 1] = (uint32_t)total_bits;
+        block[SHA1_BLOCK_INTS - 2] = (uint32_t)(total_bits >> 32);
+        sha1_transform(digest, block);
     } else {
         // there is still space
-        buffer_to_block(last_buffer, n, block);
+        sha1_buffer_to_block(last_buffer, n, block);
 
-        block[BLOCK_INTS - 1] = (uint32_t)total_bits;
-        block[BLOCK_INTS - 2] = (uint32_t)(total_bits >> 32);
-        transform(digest, block);
+        block[SHA1_BLOCK_INTS - 1] = (uint32_t)total_bits;
+        block[SHA1_BLOCK_INTS - 2] = (uint32_t)(total_bits >> 32);
+        sha1_transform(digest, block);
     }
 
     ((uint32_t*)out)[0] = BIG_ENDIAN_32(digest[0]);

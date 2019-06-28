@@ -68,7 +68,7 @@ sha256_transform(char* buffer, uint32_t digest[8], uint32_t ms[64]) {
 }
 
 void 
-sha256(char* buffer, int length, char out[24]) {
+sha256(char* buffer, int length, char out[32]) {
     uint64_t total_bits = length * 8;
 
     uint32_t digest[8] = { 
