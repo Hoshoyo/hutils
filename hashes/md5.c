@@ -90,7 +90,7 @@ void transform(uint32_t digest[4], uint32_t block[16]) {
     digest[3] += D;
 }
 
-void md5(char* buffer, int length, char out[16]) {
+void md5(const char* buffer, int length, char out[16]) {
     uint32_t digest[] = { 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476 };
     uint32_t block[16] = {0};
 
@@ -155,9 +155,6 @@ void test_md5() {
     }
     
     for(int i = 0; i < 256; ++i) {
-        if(i == 64) {
-            int xx = 0;
-        }
         md5(in, i, res);
         printf("%d ", i);
         md5_print(res);

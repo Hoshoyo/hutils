@@ -4,19 +4,17 @@
 #include <stdint.h>
 #include "hhashes.h"
 
-#define BLOCK_INTS (16)
-#define HMAC_BLOCK_SIZE 64
-#define SHA1_BLOCK_SIZE 64
-#define BLOCK_BYTES (16 * 4)
-#define DIGEST_SIZE 5
 #define MAX(A, B) ((A > B) ? (A) : (B))
 #define MIN(A, B) ((A < B) ? (A) : (B))
 
 void
 hmac(
-    void(*hash_function)(char*, int, char*),
-    char* key, int key_length, char* message, int message_length, char* result, int result_length) 
+    void(*hash_function)(const char*, int, char*),
+    const char* key, int key_length, 
+    const char* message, int message_length, 
+    char* result, int result_length) 
 {
+    #define HMAC_BLOCK_SIZE 64
     char temp_key[HMAC_BLOCK_SIZE] = {0};
     char o_key_pad[HMAC_BLOCK_SIZE] = {0};
     char i_key_pad[HMAC_BLOCK_SIZE] = {0};
@@ -47,8 +45,43 @@ hmac(
     free(m);
 }
 
+void phash(
+    void(*hash_function)(const char*, int, char*), 
+    int hash_result_length_bytes,
+    const char* secret, int secret_length, 
+    const char* seed, int seed_length, 
+    char* result, int result_length_bytes) 
+{
+    int length = result_length_bytes;
+    char A[512] = {0};
+    char T[512] = {0};
+
+    // Calculate A(1) = hmac(secret, A(0))
+    hmac(hash_function, secret, secret_length, seed, seed_length, A, hash_result_length_bytes);
+
+    if(length == 0) return;
+    char* temp = calloc(1, hash_result_length_bytes + seed_length);
+    memcpy(temp + hash_result_length_bytes, seed, secret_length);
+
+    int offset = 0;
+    while(length > 0) {
+        // Next A
+        memcpy(temp, A, hash_result_length_bytes);
+
+        hmac(hash_function, secret, secret_length, temp, hash_result_length_bytes + seed_length, T, hash_result_length_bytes);
+        int a = MIN(length, hash_result_length_bytes);
+        memcpy(result + offset, T, a);
+        length -= a;
+        offset += a;
+
+        hmac(hash_function, secret, secret_length, A, hash_result_length_bytes, A, hash_result_length_bytes);
+    }
+
+    free(temp);
+}
+
 // prf12 implements the TLS 1.2 pseudo-random function, as defined in RFC 5246, Section 5.
-void prf12(void(*hash_function)(char*, int, char*), 
+void prf12(void(*hash_function)(const char*, int, char*), 
     int hash_result_length,
     const char* secret, int secret_length,
     const char* label, int label_length,
@@ -99,38 +132,6 @@ void prf10(
     free(s2);
     free(label_and_seed);
     free(res_temp);
-}
-
-void phash(
-    void(*hash_function)(char*, int, char*), int hash_result_length_bytes,
-    char* secret, int secret_length, char* seed, int seed_length, char* result, int result_length_bytes) 
-{
-    int length = result_length_bytes;
-    char A[512] = {0};
-    char T[512] = {0};
-
-    // Calculate A(1) = hmac(secret, A(0))
-    hmac(hash_function, secret, secret_length, seed, seed_length, A, hash_result_length_bytes);
-
-    if(length == 0) return;
-    char* temp = calloc(1, hash_result_length_bytes + seed_length);
-    memcpy(temp + hash_result_length_bytes, seed, secret_length);
-
-    int offset = 0;
-    while(length > 0) {
-        // Next A
-        memcpy(temp, A, hash_result_length_bytes);
-
-        hmac(hash_function, secret, secret_length, temp, hash_result_length_bytes + seed_length, T, hash_result_length_bytes);
-        int a = MIN(length, hash_result_length_bytes);
-        memcpy(result + offset, T, a);
-        length -= a;
-        offset += a;
-
-        hmac(hash_function, secret, secret_length, A, hash_result_length_bytes, A, hash_result_length_bytes);
-    }
-
-    free(temp);
 }
 
 void test_phash() {

@@ -7,7 +7,7 @@
 #define SHA1_DIGEST_SIZE 5
 
 static void 
-buffer_to_block(char* buffer, int length, uint32_t block[16]) {
+buffer_to_block(const char* buffer, int length, uint32_t block[16]) {
     for (uint64_t i = 0; i < BLOCK_INTS; i += 1) {
         block[i] = ((uint32_t)(buffer[4*i+3] & 0xff) | ((uint32_t)(buffer[4*i+2] & 0xff)<<8)
             | ((uint32_t)(buffer[4*i+1] & 0xff)<<16)
@@ -187,7 +187,7 @@ transform(uint32_t digest[5], uint32_t block[16]) {
 }
 
 void 
-sha1(char* buffer, int length, char out[20]) {
+sha1(const char* buffer, int length, char out[20]) {
     uint32_t digest[5] = {0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0};
     uint32_t block[16] = {0};
 
