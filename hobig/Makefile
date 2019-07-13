@@ -1,4 +1,4 @@
-all: asn1
+all: debug
 
 pkcs1: asm
 	@gcc -g pkcs1.c hobig.c asn1.c bin/random.o -o bin/pkcs1
@@ -7,9 +7,9 @@ asn1: asm
 	gcc -g test/asn1_test.c asn1.c hobig.c -o bin/asn1 bin/random.o
 	./bin/asn1
 debug: asm
-	@gcc -g test/hobig_test.c -o bin/big bin/random.o
+	@gcc -g test/hobig_test.c -o bin/big bin/random.o bin/arith.o
 release: asm
-	@gcc -g -O2 test/hobig_test.c -o bin/big bin/random.o
+	@gcc -g -O2 test/hobig_test.c -o bin/big bin/random.o bin/arith.o
 
 build-benchmark: asm
 	# build Go
@@ -28,5 +28,6 @@ plot:
 asm:
 	@mkdir -p bin
 	@nasm -felf64 random.asm -o bin/random.o
+	@nasm -felf64 arith.asm -o bin/arith.o
 clean:
 	rm test/*.txt

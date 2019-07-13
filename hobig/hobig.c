@@ -44,7 +44,7 @@ typedef enum {
 static double elapsed_times[64];
 static int    execution_count[64];
 
-#define COLLECT_TIMES 0
+#define COLLECT_TIMES 1
 
 #if COLLECT_TIMES
 #define TIME_COUNT() double time_count_start = os_time_us()
@@ -68,6 +68,12 @@ HoBigInt
 hobig_int_new(u64 v) {
     HoBigInt result = { 0, array_new(u64) };
     array_push(result.value, v);
+    return result;
+}
+
+HoBigInt
+hobig_int_make(u64 n) {
+    HoBigInt result = {0, array_new_len(u64, n) };
     return result;
 }
 
@@ -659,6 +665,48 @@ hobig_int_div(HoBigInt* dividend, HoBigInt* divisor) {
     return result;
 }
 
+// Returns the number of leading zeros
+static int 
+hobig_int_leading_zeros_count(HoBigInt n) {
+    u64 v = n.value[array_length(n.value) - 1];
+
+    int c = 64;
+    for(int i = 0; i < 64; ++i, --c) {
+        if(v == 0) break;
+        v >>= 1;
+    }
+
+    return c;
+}
+
+// Same as dividing by 2^shift_amt
+void 
+hobig_int_shr(HoBigInt* v, int shift_amt) {
+    int opposite = 64 - shift_amt;
+    u64 mask = (0xffffffffffffffff << opposite);
+    v->value[0] >>= shift_amt;
+
+    for(u64 i = 1; i < array_length(v->value); ++i) {
+        u64 current = v->value[i];
+        v->value[i] >>= shift_amt;
+        v->value[i - 1] |= (mask & (current << opposite));
+    }
+}
+
+// Same as multiplying by 2^shift_amt
+void 
+hobig_int_shl(HoBigInt* v, int shift_amt) {
+    int opposite = 64 - shift_amt;
+    u64 mask = (0xffffffffffffffff >> opposite);
+    u64 prev = 0;
+    for(u64 i = 0; i < array_length(v->value); ++i) {
+        u64 current = v->value[i];
+        v->value[i] <<= shift_amt;
+        v->value[i] |= prev;
+        prev = (current >> opposite) & mask;
+    }
+}
+
 HoBigInt
 hobig_int_mod_div(HoBigInt* n, HoBigInt* exp, HoBigInt* m) {
     TIME_COUNT();
@@ -893,4 +941,45 @@ hobig_random_possible_prime(int bits) {
     }
 
     return result;
+}
+
+
+HoBigInt
+hobig_int_mod_div_fast(HoBigInt* n, HoBigInt* exp, HoBigInt* m) {
+    HoBigInt answer = hobig_int_new(1);
+    HoBigInt two = hobig_int_new(2);
+
+    HoBigInt_DivResult r = hobig_int_div(n, m);
+    HoBigInt base = r.remainder;
+    hobig_free(r.quotient);
+
+    HoBigInt e = hobig_int_copy(*exp);
+
+    int i = 0;
+	while (e.value[0] > 0) {
+		if ((e.value[0] & 1) == 1) {
+            hobig_int_mul(&answer, &base);
+            HoBigInt_DivResult r = hobig_int_div(&answer, m);
+            hobig_free(answer);
+            hobig_free(r.quotient);
+			answer = r.remainder;
+		}
+
+        // TODO(psv): better div by 2
+        HoBigInt_DivResult dr = hobig_int_div(&e, &two);
+        hobig_free(e);
+        hobig_free(dr.remainder);
+        e = dr.quotient;
+
+        hobig_int_mul(&base, &base);
+
+        HoBigInt_DivResult bb = hobig_int_div(&base, m);
+        hobig_free(bb.quotient);
+        hobig_free(base);
+        base = bb.remainder;
+
+        //printf("%d\n", i++);
+	}
+
+    return answer;
 }
