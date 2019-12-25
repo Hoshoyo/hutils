@@ -9,6 +9,14 @@
 
     ----------------------------------------------------------------------------------
 
+    Warning: since the array_push function modifies the original array pointer,
+    be aware that passing a light_array as a parameter to a function that pushes
+    on it will not work by default. To do this you must pass the address of the original 
+    array, otherwise all previous references to the array will keep the already freed
+    memory.
+
+    ----------------------------------------------------------------------------------
+
     define LIGHT_ARRAY_NO_CRT if you don't want the c runtime library included
     if that is defined, you must provide implementations for the following functions:
 
@@ -140,5 +148,12 @@ static LIGHT_ARRAY_API void* array_dyn_allocate_capacity(size_t size_element, si
 #define array_copy(A) ((void*)((Dynamic_ArrayBase*) \
     memmove((Dynamic_ArrayBase*)array_dyn_allocate_capacity(sizeof(*A), array_capacity(A)) - 1, \
     array_base(A), sizeof(Dynamic_ArrayBase) + array_length(A) * sizeof(*A)) + 1))
+
+/* appends all elements from A2 at the end of A1. A2 remains unchanged */
+#define array_append(A1, A2) (array_length(A1) + array_length(A2) >= array_capacity(A1)) \
+    ? *((void**)&(A1)) = (void*)((Dynamic_ArrayBase*)realloc((Dynamic_ArrayBase*)(A1) - 1, sizeof(Dynamic_ArrayBase) + sizeof(*(A1)) * (array_capacity(A1) + array_capacity(A2)) * 2) + 1), \
+    array_capacity(A1) = (array_capacity(A1) + array_capacity(A2)) * 2 : 0, \
+    memcpy(A1 + array_length(A1), A2, array_length(A2) * sizeof(*(A1))), \
+    array_length(A1) += array_length(A2)
 
 #endif /* H_LIGHT_ARRAY */
