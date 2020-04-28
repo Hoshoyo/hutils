@@ -103,9 +103,18 @@ void* hoht_get_value(Hoht_Table* table, const char* key);
     value doesn't exist, 0 otherwise. This operation is always O(1). */
 int hoht_delete(Hoht_Table* table, const char* key);
 
+/*  hoht_serialize
+    serializes the hash table in a file with given filename */
+int hoht_serialize(const char* filename, Hoht_Table* table);
+
+/*  hoht_load_from_file
+    loads into out_table a table serialized using hoht_serialize, this function
+    allocates memory for entries using the allocator passed. */
+int hoht_load_from_file(const char* filename, Hoht_Table* out_table, void*(*allocator)(size_t), void(*freer)(void*));
+
 #if defined(HOHT_IMPLEMENTATION)
 
-#define HASH_TABLE_OCCUPIED (1 << 0)
+static unsigned int HASH_TABLE_OCCUPIED = (1 << 0);
 
 typedef struct Hoht_Table_Entry {
     uint32_t flags;
@@ -359,7 +368,51 @@ hoht_print(Hoht_Table* table, int indent_level) {
         hoht_print_entry(entry_ptr, table->print_entry, table->entry_size_bytes, i, indent_level);
     }
 }
-#endif
 
-#undef HASH_TABLE_OCCUPIED
+int
+hoht_serialize(const char* filename, Hoht_Table* table) {
+    FILE* out = fopen(filename, "wb");
+    if(out == 0) return -1;
+
+    if(fwrite(table, sizeof(*table), 1, out) != 1) {
+        fclose(out);
+        return -1;
+    }
+    size_t bytes_to_write = table->capacity * (table->entry_size_bytes + sizeof(Hoht_Table_Entry));
+    if(fwrite(table->entries, bytes_to_write, 1, out) != 1) {
+        fclose(out);
+        return -1;
+    }
+    fclose(out);
+    return 0;
+}
+
+int
+hoht_load_from_file(const char* filename, Hoht_Table* out_table, void*(*allocator)(size_t), void(*freer)(void*)) {
+    FILE* in = fopen(filename, "rb");
+    if(in == 0) return -1;
+
+    fseek(in, 0, SEEK_END);
+    long file_size_bytes = ftell(in);
+    rewind(in);
+
+    if(fread(out_table, sizeof(*out_table), 1, in) != 1) {
+        fclose(in);
+        return -1;
+    }
+
+    size_t bytes_to_read = out_table->capacity * (out_table->entry_size_bytes + sizeof(Hoht_Table_Entry));
+    out_table->entries = allocator(bytes_to_read);
+    memset(out_table->entries, 0, bytes_to_read);
+    if(fread(out_table->entries, bytes_to_read, 1, in) != 1) {
+        fclose(in);
+        return -1;
+    }
+    fclose(in);
+    out_table->allocator = allocator;
+    out_table->freer = freer;
+    return 0;
+}
+
+#endif
 #endif
