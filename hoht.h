@@ -319,6 +319,51 @@ hoht_delete(Hoht_Table* table, const char* key) {
     }
 }
 
+int
+hoht_serialize(const char* filename, Hoht_Table* table) {
+    FILE* out = fopen(filename, "wb");
+    if(out == 0) return -1;
+
+    if(fwrite(table, sizeof(*table), 1, out) != 1) {
+        fclose(out);
+        return -1;
+    }
+    size_t bytes_to_write = table->capacity * (table->entry_size_bytes + sizeof(Hoht_Table_Entry));
+    if(fwrite(table->entries, bytes_to_write, 1, out) != 1) {
+        fclose(out);
+        return -1;
+    }
+    fclose(out);
+    return 0;
+}
+
+int
+hoht_load_from_file(const char* filename, Hoht_Table* out_table, void*(*allocator)(size_t), void(*freer)(void*)) {
+    FILE* in = fopen(filename, "rb");
+    if(in == 0) return -1;
+
+    fseek(in, 0, SEEK_END);
+    long file_size_bytes = ftell(in);
+    rewind(in);
+
+    if(fread(out_table, sizeof(*out_table), 1, in) != 1) {
+        fclose(in);
+        return -1;
+    }
+
+    size_t bytes_to_read = out_table->capacity * (out_table->entry_size_bytes + sizeof(Hoht_Table_Entry));
+    out_table->entries = allocator(bytes_to_read);
+    memset(out_table->entries, 0, bytes_to_read);
+    if(fread(out_table->entries, bytes_to_read, 1, in) != 1) {
+        fclose(in);
+        return -1;
+    }
+    fclose(in);
+    out_table->allocator = allocator;
+    out_table->freer = freer;
+    return 0;
+}
+
 #if defined(HOHT_PRINTING_IMPLEMENTATION)
 
 static void 
@@ -367,51 +412,6 @@ hoht_print(Hoht_Table* table, int indent_level) {
         Hoht_Table_Entry* entry_ptr = (Hoht_Table_Entry*)((char*)table->entries + (sizeof(Hoht_Table_Entry) + table->entry_size_bytes) * i);
         hoht_print_entry(entry_ptr, table->print_entry, table->entry_size_bytes, i, indent_level);
     }
-}
-
-int
-hoht_serialize(const char* filename, Hoht_Table* table) {
-    FILE* out = fopen(filename, "wb");
-    if(out == 0) return -1;
-
-    if(fwrite(table, sizeof(*table), 1, out) != 1) {
-        fclose(out);
-        return -1;
-    }
-    size_t bytes_to_write = table->capacity * (table->entry_size_bytes + sizeof(Hoht_Table_Entry));
-    if(fwrite(table->entries, bytes_to_write, 1, out) != 1) {
-        fclose(out);
-        return -1;
-    }
-    fclose(out);
-    return 0;
-}
-
-int
-hoht_load_from_file(const char* filename, Hoht_Table* out_table, void*(*allocator)(size_t), void(*freer)(void*)) {
-    FILE* in = fopen(filename, "rb");
-    if(in == 0) return -1;
-
-    fseek(in, 0, SEEK_END);
-    long file_size_bytes = ftell(in);
-    rewind(in);
-
-    if(fread(out_table, sizeof(*out_table), 1, in) != 1) {
-        fclose(in);
-        return -1;
-    }
-
-    size_t bytes_to_read = out_table->capacity * (out_table->entry_size_bytes + sizeof(Hoht_Table_Entry));
-    out_table->entries = allocator(bytes_to_read);
-    memset(out_table->entries, 0, bytes_to_read);
-    if(fread(out_table->entries, bytes_to_read, 1, in) != 1) {
-        fclose(in);
-        return -1;
-    }
-    fclose(in);
-    out_table->allocator = allocator;
-    out_table->freer = freer;
-    return 0;
 }
 
 #endif
