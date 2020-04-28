@@ -98,6 +98,11 @@ int hoht_get(Hoht_Table* table, const char* key, void* out);
     0 (NULL) otherwise. */
 void* hoht_get_value(Hoht_Table* table, const char* key);
 
+/*  hoht_get_value_from_index
+    retreives the entry pointer as a void* given the hash index if the entry exists in the hash, 
+    0 (NULL) otherwise. */
+void* hoht_get_value_from_index(Hoht_Table* table, int index);
+
 /*  hoht_delete
     deletes from the hash table the value correspondent to the key, returns -1 if the
     value doesn't exist, 0 otherwise. This operation is always O(1). */
@@ -285,6 +290,16 @@ hoht_get_value(Hoht_Table* table, const char* key) {
     }
 }
 
+void*
+hoht_get_value_from_index(Hoht_Table* table, int index) {
+    Hoht_Table_Entry* entry_ptr = (Hoht_Table_Entry*)((char*)table->entries + (sizeof(Hoht_Table_Entry) + table->entry_size_bytes) * index);
+    if(entry_ptr->flags & HASH_TABLE_OCCUPIED) {
+        return entry_ptr->entry;
+    } else {
+        return 0;
+    }
+}
+
 int 
 hoht_delete(Hoht_Table* table, const char* key) {
     uint64_t hash = hoht_fnv_1_hash(key, strlen(key));
@@ -317,6 +332,7 @@ hoht_delete(Hoht_Table* table, const char* key) {
             entry->flags = 0;
         }
     }
+    return 0;
 }
 
 int
