@@ -49,6 +49,12 @@ typedef struct {
     void* entries;
 } Hoht_Table;
 
+/*  macro that returns hash entry value dereferenced from table(T), type(K) and index(I) */
+#define HOHT_GET_ENTRY_FROM_INDEX(T, K, I) (*(K*)((Hoht_Table_Entry*)((char*)(T)->entries + (sizeof(Hoht_Table_Entry) + (T)->entry_size_bytes) * (I)))->entry)
+
+/*  macro that returns hash entry value pointer as void* from table(T), type(TYPE) and key(KEY) */
+#define HOHT_GET_ENTRY(T, TYPE, KEY) (*(TYPE*)hoht_get_value(T, KEY))
+
 /*  hoht_new
     creates a new hash table with capacity number of max entries.
     'entry_size_bytes' is the size of the type stored inside the table
@@ -73,16 +79,24 @@ int hoht_grow(Hoht_Table* table, int factor);
 
 /*  hoht_push 
     inserts a value to the hash table, this can trigger a table grow call
-    if the occupancy max is reached, otherwise is an O(1) operation. */
+    if the occupancy max is reached, otherwise is an O(1) operation. 
+    returns index in the table of the inserted value */
 int hoht_push(Hoht_Table* table, const char* key, void* value);
 
 /*  hoht_push_hashed
     same as hoht_push but taking the hash from the key directly. */
 int hoht_push_hashed(Hoht_Table* table, uint64_t hash, void* value);
 
-/*  hoht_get 
-    retreives from the hash table the value, given a key, this operation is always O(1) */
+/*  hoht_get
+    retreives from the hash table the index and value in out (must be allocated), 
+    returns -1 if the key does not exist in the hash table.
+    given a key, this operation is always O(1) */
 int hoht_get(Hoht_Table* table, const char* key, void* out);
+
+/*  hoht_get_value
+    retreives the entry pointer as a void* given a key if the entry exists in the hash, 
+    0 (NULL) otherwise. */
+void* hoht_get_value(Hoht_Table* table, const char* key);
 
 /*  hoht_delete
     deletes from the hash table the value correspondent to the key, returns -1 if the
@@ -217,13 +231,17 @@ hoht_get(Hoht_Table* table, const char* key, void* out) {
     Hoht_Table_Entry* entry_ptr = (Hoht_Table_Entry*)((char*)table->entries + (sizeof(Hoht_Table_Entry) + table->entry_size_bytes) * index);
     if(entry_ptr->flags & HASH_TABLE_OCCUPIED) {
         if(entry_ptr->hash == hash) {
-            memcpy(out, entry_ptr->entry, table->entry_size_bytes);
+            if(out) {
+                memcpy(out, entry_ptr->entry, table->entry_size_bytes);
+            }
             return index;
         } else {
             Hoht_Table_Entry* entry = entry_ptr->next;
             while(entry) {
                 if(entry->hash == hash) {
-                    memcpy(out, entry->entry, table->entry_size_bytes);
+                    if(out) {
+                        memcpy(out, entry->entry, table->entry_size_bytes);
+                    }
                     return index;
                 }
                 entry = entry->next;
@@ -232,6 +250,29 @@ hoht_get(Hoht_Table* table, const char* key, void* out) {
         }
     } else {
         return -1;
+    }
+}
+
+void*
+hoht_get_value(Hoht_Table* table, const char* key) {
+    uint64_t hash = hoht_fnv_1_hash(key, strlen(key));
+    int index = (int)(hash % (uint64_t)table->capacity);
+    Hoht_Table_Entry* entry_ptr = (Hoht_Table_Entry*)((char*)table->entries + (sizeof(Hoht_Table_Entry) + table->entry_size_bytes) * index);
+    if(entry_ptr->flags & HASH_TABLE_OCCUPIED) {
+        if(entry_ptr->hash == hash) {
+            return entry_ptr->entry;
+        } else {
+            Hoht_Table_Entry* entry = entry_ptr->next;
+            while(entry) {
+                if(entry->hash == hash) {
+                    return entry_ptr->entry;
+                }
+                entry = entry->next;
+            }
+            return 0;
+        }
+    } else {
+        return 0;
     }
 }
 
