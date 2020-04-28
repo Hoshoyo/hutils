@@ -52,7 +52,7 @@ int main(int argc, char** argv)
 
 ## [HoGL](https://github.com/Hoshoyo/hutils/blob/master/ho_gl.h)
 
-A minimal OpenGL extensions library for `C++`.
+A minimal OpenGL extensions library for `C/C++`.
 
 ```c
 #define HOGL_IMPLEMENT // only in one compilation unit
@@ -72,10 +72,35 @@ int main(int argc, char** argv) {
 }
 ```
 
-## Ho Math (Deprecated)
+## [HoHT](https://github.com/Hoshoyo/hutils/blob/master/hoht.h)
 
-A math library for `C++`.
+A growing hash table implementation for `C/C++`.
 
-## Dynamic Array (Deprecated)
+```c
+#include <stdio.h>
+#define HOHT_IMPLEMENTATION
+#include "hoht.h"
 
-A fast dynamic array library for `C/C++`.
+int main() {
+    // 10 initial capacity, 50% occupancy ratio
+    Hoht_Table table = {0};
+    hoht_new(&table, 10, sizeof(int), 0.5f, malloc, free);
+
+    int a = 1;
+    int b = 2;
+    int c = 3;
+
+    hoht_push(&table, "Hello1", &a);
+    hoht_push(&table, "Hello2", &b);
+    hoht_push(&table, "Hello3", &c);
+
+    int a_res;
+    hoht_get(&table, "Hello1", &a_res);
+
+    int b_res = *(int*)hoht_get_value(&table, "Hello2");
+
+    // will print 
+    // a is: 1 and b is: 2
+    printf("a is: %d and b is: %d\n", a_res, b_res);
+}
+```
