@@ -35,6 +35,11 @@
 #include <stdio.h>
 #endif
 
+/* Define HOHT_SERIALIZE_IMPLEMENTATION for serialization functions */
+#if defined(HOHT_SERIALIZE_IMPLEMENTATION)
+#include <stdio.h>
+#endif
+
 typedef struct {
     int   entry_count;
     int   capacity;
@@ -80,23 +85,31 @@ int hoht_grow(Hoht_Table* table, int factor);
 /*  hoht_push 
     inserts a value to the hash table, this can trigger a table grow call
     if the occupancy max is reached, otherwise is an O(1) operation. 
-    returns index in the table of the inserted value */
+    returns index in the table of the inserted value.
+    The key must be zero terminated, if it is not, use hoht_push_length or
+    hoht_push_hashed instead */
 int hoht_push(Hoht_Table* table, const char* key, void* value);
-
-/*  hoht_push_hashed
-    same as hoht_push but taking the hash from the key directly. */
+int hoht_push_length(Hoht_Table* table, const char* key, int key_length, void* value);
 int hoht_push_hashed(Hoht_Table* table, uint64_t hash, void* value);
 
 /*  hoht_get
-    retreives from the hash table the index and value in out (must be allocated), 
+    retreives from the hash table the index and value in out (must be allocated by caller), 
     returns -1 if the key does not exist in the hash table.
-    given a key, this operation is always O(1) */
+    given a key, this operation is always O(1).
+    The key must be zero terminated, if it is not, use hoht_get_length or
+    hoht_get_hashed instead */
 int hoht_get(Hoht_Table* table, const char* key, void* out);
+int hoht_get_length(Hoht_Table* table, const char* key, int key_length, void* out);
+int hoht_get_hashed(Hoht_Table* table, uint64_t hash, void* out);
 
 /*  hoht_get_value
     retreives the entry pointer as a void* given a key if the entry exists in the hash, 
-    0 (NULL) otherwise. */
+    0 (NULL) otherwise. 
+    The key must be zero terminated, if it is not, use hoht_get_value_length or
+    hoht_get_value_hashed instead */
 void* hoht_get_value(Hoht_Table* table, const char* key);
+void* hoht_get_value_length(Hoht_Table* table, const char* key, int key_length);
+void* hoht_get_value_hashed(Hoht_Table* table, uint64_t hash);
 
 /*  hoht_get_value_from_index
     retreives the entry pointer as a void* given the hash index if the entry exists in the hash, 
@@ -105,8 +118,12 @@ void* hoht_get_value_from_index(Hoht_Table* table, int index);
 
 /*  hoht_delete
     deletes from the hash table the value correspondent to the key, returns -1 if the
-    value doesn't exist, 0 otherwise. This operation is always O(1). */
+    value doesn't exist, 0 otherwise. This operation is always O(1). 
+    The key must be zero terminated, if it is not, use hoht_delete_length or
+    hoht_delete_hashed instead */
 int hoht_delete(Hoht_Table* table, const char* key);
+int hoht_delete_length(Hoht_Table* table, const char* key, int key_length);
+int hoht_delete_hashed(Hoht_Table* table, uint64_t hash);
 
 /*  hoht_serialize
     serializes the hash table in a file with given filename */
@@ -238,8 +255,13 @@ hoht_push(Hoht_Table* table, const char* key, void* value) {
 }
 
 int
-hoht_get(Hoht_Table* table, const char* key, void* out) {
-    uint64_t hash = hoht_fnv_1_hash(key, strlen(key));
+hoht_push_length(Hoht_Table* table, const char* key, int key_length, void* value) {
+    uint64_t hash = hoht_fnv_1_hash(key, key_length);
+    return hoht_push_hashed(table, hash, value);
+}
+
+int
+hoht_get_hashed(Hoht_Table* table, uint64_t hash, void* out) {
     int index = (int)(hash % (uint64_t)table->capacity);
     
     Hoht_Table_Entry* entry_ptr = (Hoht_Table_Entry*)((char*)table->entries + (sizeof(Hoht_Table_Entry) + table->entry_size_bytes) * index);
@@ -267,9 +289,19 @@ hoht_get(Hoht_Table* table, const char* key, void* out) {
     }
 }
 
-void*
-hoht_get_value(Hoht_Table* table, const char* key) {
+int
+hoht_get_length(Hoht_Table* table, const char* key, int key_length, void* out) {
     uint64_t hash = hoht_fnv_1_hash(key, strlen(key));
+    return hoht_get_hashed(table, hash, out);
+}
+
+int
+hoht_get(Hoht_Table* table, const char* key, void* out) {
+    return hoht_get_length(table, key, strlen(key), out);
+}
+
+void*
+hoht_get_value_hashed(Hoht_Table* table, uint64_t hash) {
     int index = (int)(hash % (uint64_t)table->capacity);
     Hoht_Table_Entry* entry_ptr = (Hoht_Table_Entry*)((char*)table->entries + (sizeof(Hoht_Table_Entry) + table->entry_size_bytes) * index);
     if(entry_ptr->flags & HASH_TABLE_OCCUPIED) {
@@ -291,6 +323,18 @@ hoht_get_value(Hoht_Table* table, const char* key) {
 }
 
 void*
+hoht_get_value_length(Hoht_Table* table, const char* key, int key_length) {
+    uint64_t hash = hoht_fnv_1_hash(key, key_length);
+    return hoht_get_value_hashed(table, hash);
+}
+
+void*
+hoht_get_value(Hoht_Table* table, const char* key) {
+    uint64_t hash = hoht_fnv_1_hash(key, strlen(key));
+    return hoht_get_value_hashed(table, hash);
+}
+
+void*
 hoht_get_value_from_index(Hoht_Table* table, int index) {
     Hoht_Table_Entry* entry_ptr = (Hoht_Table_Entry*)((char*)table->entries + (sizeof(Hoht_Table_Entry) + table->entry_size_bytes) * index);
     if(entry_ptr->flags & HASH_TABLE_OCCUPIED) {
@@ -300,9 +344,7 @@ hoht_get_value_from_index(Hoht_Table* table, int index) {
     }
 }
 
-int 
-hoht_delete(Hoht_Table* table, const char* key) {
-    uint64_t hash = hoht_fnv_1_hash(key, strlen(key));
+int hoht_delete_hashed(Hoht_Table* table, uint64_t hash) {
     int index = (int)(hash % (uint64_t)table->capacity);
 
     Hoht_Table_Entry* entry_ptr = (Hoht_Table_Entry*)((char*)table->entries + (sizeof(Hoht_Table_Entry) + table->entry_size_bytes) * index);
@@ -335,6 +377,20 @@ hoht_delete(Hoht_Table* table, const char* key) {
     return 0;
 }
 
+int
+hoht_delete_length(Hoht_Table* table, const char* key, int key_length) {
+    uint64_t hash = hoht_fnv_1_hash(key, key_length);
+    return hoht_delete_hashed(table, hash);
+}
+
+int 
+hoht_delete(Hoht_Table* table, const char* key) {
+    uint64_t hash = hoht_fnv_1_hash(key, strlen(key));
+    return hoht_delete_hashed(table, hash);
+}
+
+
+#if defined(HOHT_SERIALIZE_IMPLEMENTATION)
 int
 hoht_serialize(const char* filename, Hoht_Table* table) {
     FILE* out = fopen(filename, "wb");
@@ -379,6 +435,7 @@ hoht_load_from_file(const char* filename, Hoht_Table* out_table, void*(*allocato
     out_table->freer = freer;
     return 0;
 }
+#endif
 
 #if defined(HOHT_PRINTING_IMPLEMENTATION)
 
