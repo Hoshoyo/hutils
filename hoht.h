@@ -311,7 +311,7 @@ hoht_get_value_hashed(Hoht_Table* table, uint64_t hash) {
             Hoht_Table_Entry* entry = entry_ptr->next;
             while(entry) {
                 if(entry->hash == hash) {
-                    return entry_ptr->entry;
+                    return entry->entry;
                 }
                 entry = entry->next;
             }
