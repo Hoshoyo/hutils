@@ -223,15 +223,12 @@ void test_phash2() {
 
 int main() {
     test_prf();
-    //test_phash2();
-    //test_hmac();
+    test_phash2();
+    test_hmac();
 
-    //char res[16] = {0};
-    //md5("gigantic key which shall not be passed as an argument to any function", sizeof("gigantic key which shall not be passed as an argument to any function") - 1, res);
-    //md5_print(res);
+    char res[16] = {0};
+    md5("gigantic key which shall not be passed as an argument to any function", sizeof("gigantic key which shall not be passed as an argument to any function") - 1, res);
+    md5_print(res);
 
     return 0;
 }
-
-
-// 89 63 75 96 ab a3 14 f c3 b2 8 b5 dd 93 ad e8 64 dc f9 5 73 26 9a 56 93 be f9 65 d9 70 79 dd 47 1 3c 83 af 36 0 b6 23 25 3b fb f6 45 c1 a4
