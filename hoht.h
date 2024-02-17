@@ -223,7 +223,7 @@ hoht_push_hashed(Hoht_Table* table, uint64_t hash, void* value) {
     Hoht_Table_Entry* entry_ptr = (Hoht_Table_Entry*)((char*)table->entries + (sizeof(Hoht_Table_Entry) + table->entry_size_bytes) * index);
     Hoht_Table_Entry* entry = entry_ptr;
     if(entry_ptr->flags & HASH_TABLE_OCCUPIED) {
-        if (entry_ptr->hash == hash) {
+        if (entry_ptr->hash == hash && memcmp(entry->entry, value, table->entry_size_bytes) == 0) {
             /* same entry */
             return index;
         } else {
