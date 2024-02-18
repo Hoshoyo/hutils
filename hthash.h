@@ -9,7 +9,7 @@
 
 /*  Define HT_IMPLEMENTATION in one of your compilation units
 	Define HT_LINKED_LIST_GROW for a linked list version
-	
+
 	Example usage:
 
 	#define HT_IMPLEMENTATION
@@ -85,15 +85,17 @@
 		return 0;
 	}
 */
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 #if defined (_WIN32) || defined(_WIN64)
 #ifndef PF_AVX_INSTRUCTIONS_AVAILABLE
 #define PF_AVX_INSTRUCTIONS_AVAILABLE 39
 #endif
-#if defined(__cplusplus)
-extern "C"
-#endif
+#if !defined(_WINDOWS_)
 __declspec(dllimport) int __stdcall IsProcessorFeaturePresent(uint32_t feature);
+#endif
 #endif
 
 #define HT_DEFAULT_INITIAL_SIZE 64
@@ -211,7 +213,7 @@ ht_internal_hash_fnv1(void* key, uint32_t length)
 	return hash;
 }
 
-inline static uint32_t 
+inline static uint32_t
 swap_uint32(uint32_t val)
 {
 	val = ((val << 8) & 0xFF00FF00) | ((val >> 8) & 0xFF00FF);
@@ -291,7 +293,7 @@ ht_new_ex(HtTable* table, uint32_t flags, uint32_t entry_size, float occupancy, 
 
 #ifdef _WIN32
 	/* TODO(psv) : Check for AES features */
-	if (IsProcessorFeaturePresent(PF_AVX_INSTRUCTIONS_AVAILABLE))
+	if (IsProcessorFeaturePresent((uint32_t)PF_AVX_INSTRUCTIONS_AVAILABLE))
 		table->hashfunc = (hashfunc != 0) ? hashfunc : ht_internal_hash;
 	else
 		table->hashfunc = (hashfunc != 0) ? hashfunc : ht_internal_hash_fnv1;
@@ -681,7 +683,7 @@ ht_next(HtTable* table, HtIterator* it)
 	{
 		do {
 			entry = (HtEntry*)((char*)table->entries + it->at * entry_size);
-			it->at = (it->at + 1);			
+			it->at = (it->at + 1);
 			if (it->at >= table->table_size)
 				break;
 		} while (!(entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED) || (entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE));
@@ -700,7 +702,7 @@ ht_next(HtTable* table, HtIterator* it)
 		uint64_t spill_index = it->at - table->table_size - 1;
 		do {
 			entry = (HtEntry*)((char*)table->spill_entries_start + spill_index * entry_size);
-			it->at = (it->at + 1);			
+			it->at = (it->at + 1);
 			spill_index++;
 			if (spill_index >= table->spill_entries_size)
 				return 0;
@@ -728,4 +730,9 @@ ht_next(HtTable* table, HtIterator* it)
 }
 #endif
 #endif // HT_IMPLEMENTATION
+
+#if defined(__cplusplus)
+}
+#endif // extern "C"
+
 #endif // HTHASH_
