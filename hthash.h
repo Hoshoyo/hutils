@@ -111,6 +111,8 @@ typedef struct {
 typedef struct {
 	uint64_t i;
 	uint64_t at;
+	void*    key;
+	uint32_t keysize_bytes;
 } HtIterator;
 
 typedef struct {
@@ -476,7 +478,12 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 		case 4: entry->key = (void*)*(uint32_t*)key; break;
 		case 2: entry->key = (void*)*(uint16_t*)key; break;
 		case 1: entry->key = (void*)*(uint8_t*)key; break;
-		default: entry->key = (void*)key; break;
+		default: {
+			if (table->flags & HTABLE_DONT_COPY_KEYS)
+				entry->key = (void*)key;
+			else
+				entry->key = ht_arena_copy(table, (void*)key, keysize_bytes);
+		} break;
 	}
 	entry->keysize_bytes = keysize_bytes;
 	entry->flags |= HTABLE_ENTRY_FLAG_OCCUPIED;
@@ -748,6 +755,8 @@ ht_next(HtTable* table, HtIterator* it)
 		if (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED && !(entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE))
 		{
 			it->i++;
+			it->key = entry->key;
+			it->keysize_bytes = entry->keysize_bytes;
 			return entry->data;
 		}
 	}
@@ -768,6 +777,8 @@ ht_next(HtTable* table, HtIterator* it)
 	}
 
 	it->i++;
+	it->key = entry->key;
+	it->keysize_bytes = entry->keysize_bytes;
 	return entry->data;
 }
 #else
