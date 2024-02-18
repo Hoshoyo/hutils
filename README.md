@@ -30,21 +30,37 @@ int main(int argc, char** argv)
 
 ---
 
-## [Light Arena](https://github.com/Hoshoyo/hutils/blob/master/light_arena.h)
+## [Light Arena](https://github.com/Hoshoyo/hutils/blob/master/liarena.h)
 
-A fast memory arena allocator library for `C/C++`.
+A fast memory arena allocator library for `C/C++`. Reserves a contiguous memory block.
 
 ```c
-#include "light_arena.h"
+#define LIGHT_ARENA_IMPLEMENT
+#include "liarena.h"
 
-int main(int argc, char** argv)
+int main()
 {
-    Light_Arena* arena = arena_create(512);
+    // Create an arena with default LIGHT_ARENA_MAX_RESERVED_VIRTUAL_SPACE_GB Gigabytes of max space.
+    Light_Arena* arena = liarena_create();
 
-    void* m1 = arena_alloc(arena, 64);
-    void* m2 = arena_alloc(arena, 84);
+    // Allocates 128 bytes aligned to 8 bytes by default.
+    void* mem_aligned8 = liarena_alloc(arena, 128);
 
-    arena_free(arena);
+    // Allocates 1024 bytes aligned to 32 bytes.
+    void* mem_aligned32 = liarena_alloc_aligned(arena, 1024, 32);
+
+    // Allocates 64 bytes unaligned (aligned to 0 bytes).
+    void* mem_unaligned = liarena_alloc_unaligned(arena, 64);
+
+    // Resets all the allocations in the arena, but doesn't release
+    // the memory back to the OS.
+    liarena_clear(arena);
+
+    // Releases all the extra memory not needed currently to the OS.
+    liarena_trim(arena);
+
+    // Free's the arena completely, after this point the arena is invalid.
+    liarena_free(arena);
 
     return 0;
 }
@@ -72,7 +88,7 @@ int main(int argc, char** argv) {
 }
 ```
 
-## [HtHash](https://github.com/Hoshoyo/hutils/blob/master/hoht.h)
+## [HtHash](https://github.com/Hoshoyo/hutils/blob/master/hthash.h)
 
 A growing hash table implementation for `C/C++`. 
 
