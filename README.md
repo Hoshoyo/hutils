@@ -72,35 +72,44 @@ int main(int argc, char** argv) {
 }
 ```
 
-## [HoHT](https://github.com/Hoshoyo/hutils/blob/master/hoht.h)
+## [HtHash](https://github.com/Hoshoyo/hutils/blob/master/hoht.h)
 
-A growing hash table implementation for `C/C++`.
+A growing hash table implementation for `C/C++`. 
 
 ```c
 #include <stdio.h>
-#define HOHT_IMPLEMENTATION
-#include "hoht.h"
+#define HT_IMPLEMENTATION
+#include "hthash.h"
 
-int main() {
-    // 10 initial capacity, 50% occupancy ratio
-    Hoht_Table table = {0};
-    hoht_new(&table, 10, sizeof(int), 0.5f, malloc, free);
+int main()
+{
+    // Create table
+    HtTable table = { 0 };
+    ht_new(&table, 0, sizeof(int));
 
-    int a = 1;
-    int b = 2;
-    int c = 3;
+    // Store integers both as keys and values
+    for (int i = 0; i < 10; ++i)
+        ht_add(&table, &i, sizeof(int), &i);
 
-    hoht_push(&table, "Hello1", &a);
-    hoht_push(&table, "Hello2", &b);
-    hoht_push(&table, "Hello3", &c);
+    // Delete a value
+    int two = 2;
+    ht_delete(&table, &two, sizeof(int));
 
-    int a_res;
-    hoht_get(&table, "Hello1", &a_res);
+    // Find a value
+    int three = 3;
+    int* val = ht_get(&table, &three, sizeof(int));
+    // Prints 3
+    printf("The value is: %d\n", *val);
 
-    int b_res = *(int*)hoht_get_value(&table, "Hello2");
+    // Overwrite a value
+    int ten = 10;
+    ht_add(&table, &three, sizeof(int), &ten);
 
-    // will print 
-    // a is: 1 and b is: 2
-    printf("a is: %d and b is: %d\n", a_res, b_res);
+    // Iterate through all values
+    int* value = 0;
+    for (HtIterator it = { 0 }; value = ht_next(&table, &it);)
+        printf("%lld: %d\n", it.i, *value);
+
+    return 0;
 }
 ```
