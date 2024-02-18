@@ -1,3 +1,5 @@
+#ifndef HTHASH_
+#define HTHASH_
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -489,3 +491,4 @@ ht_next(HtTable* table, HtIterator* it)
 }
 
 #endif
+#endif // HTHASH_
