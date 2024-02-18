@@ -103,6 +103,12 @@ __declspec(dllimport) int __stdcall IsProcessorFeaturePresent(uint32_t feature);
 #define HT_DEFAULT_GROWTH_FACTOR 1.0f	/* 100% */
 
 typedef struct {
+	size_t capacity;    // the current committed memory capacity of the arena
+	void*  base;        // pointer to the base memory of the arena
+	void*  at;
+} HtArena;
+
+typedef struct {
 	uint64_t i;
 	uint64_t at;
 } HtIterator;
@@ -136,6 +142,8 @@ typedef struct {
 	uint64_t(*hashfunc)(void*, uint32_t);
 	void* (*growfunc)(uint64_t);
 
+	HtArena key_arena;
+
 #ifdef HT_STATISTICS
 	uint64_t grow_count;
 	uint64_t add_collision_count;
@@ -145,6 +153,7 @@ typedef struct {
 
 /* Does not allow the table to grow, instead if it were to grow, just return zero from ht_add */
 #define HTABLE_DISABLE_GROW (1 << 0)
+#define HTABLE_DONT_COPY_KEYS (1 << 1)
 
 /* Creates a new hash table where the element size is 'entry_size' and the initial size is HT_DEFAULT_INITIAL_SIZE */
 void  ht_new(HtTable* table, uint32_t flags, uint32_t entry_size);
@@ -176,8 +185,9 @@ void* ht_add(HtTable* table, const char* key, int keysize_bytes, void* value);
 void* ht_get(HtTable* table, const char* key, int keysize_bytes);
 
 /* Deletes an entry from the table. This does not free up space, just leaves a tombstone in place of the deleted value.
-   This function can therefore make the table filled with unusable entries until it grows again. */
-void  ht_delete(HtTable* table, const char* key, int keysize_bytes);
+   This function can therefore make the table filled with unusable entries until it grows again. 
+   Returns the object that was deleted, 0 if the object did not exist. */
+void* ht_delete(HtTable* table, const char* key, int keysize_bytes);
 
 /* Frees up the memory for the table, this does not need to be called in case the memory and grow function were passed directly.
    Use your own memory management in that case */
@@ -282,6 +292,19 @@ ht_new_ex(HtTable* table, uint32_t flags, uint32_t entry_size, float occupancy, 
 	table->growth_factor = growth_factor;
 	table->growfunc = (growfunc != 0) ? growfunc : ht_alloc_memory;
 	table->keyequal = (keyequal != 0) ? keyequal : ht_key_equal;
+	
+	if (!(flags & HTABLE_DONT_COPY_KEYS))
+	{
+		table->key_arena.capacity = table->table_size * 32;
+		table->key_arena.base = calloc(1, table->key_arena.capacity); // assume 32 bytes as an average key size
+		table->key_arena.at = table->key_arena.base;
+	}
+	else
+	{
+		table->key_arena.capacity = 0;
+		table->key_arena.base = 0;
+		table->key_arena.at = 0;
+	}
 
 #ifdef HT_LINKED_LIST_GROW
 	uint64_t total_table_size = table->table_size;
@@ -364,6 +387,25 @@ static uint32_t
 ht_probe_start(HtTable* table, uint64_t hash)
 {
 	return 1 + hash % (table->table_size - 1);
+}
+
+static void*
+ht_arena_copy(HtTable* table, void* key, int keysize_bytes)
+{	
+	uint64_t current_arena_size = (char*)table->key_arena.at - (char*)table->key_arena.base;
+	if (current_arena_size + keysize_bytes > table->key_arena.capacity)
+	{
+		/* Allocate more space in the arena */
+		table->key_arena.capacity *= 2;
+		table->key_arena.base = realloc(table->key_arena.base, table->key_arena.capacity);
+		table->key_arena.at = (char*)table->key_arena.base + current_arena_size;
+	}
+
+	void* result = table->key_arena.at;
+	memcpy(result, key, keysize_bytes);
+	table->key_arena.at = (char*)table->key_arena.at + keysize_bytes;
+
+	return result;
 }
 
 #ifdef HT_LINKED_LIST_GROW
@@ -498,7 +540,12 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 		case 4: entry->key = (void*)*(uint32_t*)key; break;
 		case 2: entry->key = (void*)*(uint16_t*)key; break;
 		case 1: entry->key = (void*)*(uint8_t*)key; break;
-		default: entry->key = (void*)key; break;
+		default: {
+			if (table->flags & HTABLE_DONT_COPY_KEYS)
+				entry->key = (void*)key;
+			else
+				entry->key = ht_arena_copy(table, (void*)key, keysize_bytes);
+		}break;
 	}
 	entry->keysize_bytes = keysize_bytes;
 	entry->flags |= HTABLE_ENTRY_FLAG_OCCUPIED;
@@ -595,7 +642,7 @@ ht_get(HtTable* table, const char* key, int keysize_bytes)
 #endif
 
 #ifdef HT_LINKED_LIST_GROW
-void
+void*
 ht_delete(HtTable* table, const char* key, int keysize_bytes)
 {
 	void* value = ht_get(table, key, keysize_bytes);
@@ -630,10 +677,12 @@ ht_delete(HtTable* table, const char* key, int keysize_bytes)
 				table->spill_next_free_index = (uint32_t)((at - (char*)table->spill_entries_start) / entry_size);
 			}
 		}
+		return value;
 	}
+	return 0;
 }
 #else
-void
+void*
 ht_delete(HtTable* table, const char* key, int keysize_bytes)
 {
 	void* value = ht_get(table, key, keysize_bytes);
@@ -642,7 +691,9 @@ ht_delete(HtTable* table, const char* key, int keysize_bytes)
 		HtEntry* entry = (HtEntry*)((char*)value - offsetof(HtEntry, data));
 		entry->flags |= HTABLE_ENTRY_FLAG_TOMBSTONE;
 		entry->keysize_bytes = 0;
+		return value;
 	}
+	return 0;
 }
 #endif
 
@@ -650,6 +701,13 @@ void
 ht_free(HtTable* table)
 {
 	free(table->entries);
+	if (table->key_arena.base)
+	{
+		free(table->key_arena.base);
+		table->key_arena.base = 0;
+		table->key_arena.at = 0;
+		table->key_arena.capacity = 0;
+	}
 	table->table_size = 0;
 	table->entries = 0;
 }
