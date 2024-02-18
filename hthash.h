@@ -1,12 +1,14 @@
 #ifndef HTHASH_
 #define HTHASH_
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wmmintrin.h>
 #include <immintrin.h>
 
-/* Define HT_IMPLEMENTATION in one of your compilation units
+/*  Define HT_IMPLEMENTATION in one of your compilation units
+	Define HT_LINKED_LIST_GROW for a linked list version
 	
 	Example usage:
 
@@ -95,8 +97,8 @@ __declspec(dllimport) int __stdcall IsProcessorFeaturePresent(uint32_t feature);
 #endif
 
 #define HT_DEFAULT_INITIAL_SIZE 64
-#define HT_DEFAULT_OCCUPANCY 0.7f		// 70%
-#define HT_DEFAULT_GROWTH_FACTOR 1.0f	// 100%
+#define HT_DEFAULT_OCCUPANCY 0.7f		/* 70% */
+#define HT_DEFAULT_GROWTH_FACTOR 1.0f	/* 100% */
 
 typedef struct {
 	uint64_t i;
@@ -105,9 +107,12 @@ typedef struct {
 
 typedef struct {
 	uint64_t hash;
-	void*    key;
+	void* key;
 	uint32_t keysize_bytes;
 	uint32_t flags;
+#ifdef HT_LINKED_LIST_GROW
+	int32_t  next_index;
+#endif
 	char     data[0];
 } HtEntry;
 
@@ -119,10 +124,15 @@ typedef struct {
 	uint32_t flags;
 	float    occupancy;
 	float    growth_factor;
-
+#ifdef HT_LINKED_LIST_GROW
+	HtEntry* spill_entries_start;
+	uint64_t spill_entries_size;
+	uint64_t spill_entry_count;
+	uint32_t spill_next_free_index;
+#endif
 	int(*keyequal)(const char*, const char*, uint32_t);
 	uint64_t(*hashfunc)(void*, uint32_t);
-	void*(*growfunc)(uint64_t);
+	void* (*growfunc)(uint64_t);
 
 #ifdef HT_STATISTICS
 	uint64_t grow_count;
@@ -142,7 +152,7 @@ void  ht_new_sized(HtTable* table, uint32_t flags, uint32_t entry_size, uint64_t
 
 /* Creates a hash table where:
 - 'occupancy' is the percentage of entries that can occupy the table before it grows automatically.
-- 'growth_factor' is the percentage added to the new table (i.e. 1.0f is 100%). 
+- 'growth_factor' is the percentage added to the new table (i.e. 1.0f is 100%).
 - 'hashfunc' is the hash function used in the key. If 0, uses the default one.
 - 'keyequal' is the function used to compare keys. If 0, compares all bytes in the keys for equality.
 - 'storage' is the memory used by the table to store the entries.
@@ -150,7 +160,7 @@ void  ht_new_sized(HtTable* table, uint32_t flags, uint32_t entry_size, uint64_t
 - 'growfunc' the function used to allocate a new table in case it needs to grow. The memory given by this function must be zero initialized.
 */
 void ht_new_ex(HtTable* table, uint32_t flags, uint32_t entry_size, float occupancy, float growth_factor,
-	uint64_t(*hashfunc)(void*, uint32_t), 
+	uint64_t(*hashfunc)(void*, uint32_t),
 	int(*keyequal)(const char*, const char*, uint32_t),
 	void* storage, uint32_t storage_size, void* (*growfunc)(uint64_t));
 
@@ -163,7 +173,7 @@ void* ht_add(HtTable* table, const char* key, int keysize_bytes, void* value);
 /* Finds the entry in the table and returns its value. If the value does not exist, returns 0. */
 void* ht_get(HtTable* table, const char* key, int keysize_bytes);
 
-/* Deletes an entry from the table. This does not free up space, just leaves a tombstone in place of the deleted value. 
+/* Deletes an entry from the table. This does not free up space, just leaves a tombstone in place of the deleted value.
    This function can therefore make the table filled with unusable entries until it grows again. */
 void  ht_delete(HtTable* table, const char* key, int keysize_bytes);
 
@@ -201,6 +211,13 @@ ht_internal_hash_fnv1(void* key, uint32_t length)
 	return hash;
 }
 
+inline static uint32_t 
+swap_uint32(uint32_t val)
+{
+	val = ((val << 8) & 0xFF00FF00) | ((val >> 8) & 0xFF00FF);
+	return (val << 16) | (val >> 16);
+}
+
 inline static uint64_t
 ht_internal_hash(void* key, uint32_t keysize_bytes)
 {
@@ -219,9 +236,12 @@ ht_internal_hash(void* key, uint32_t keysize_bytes)
 	if (remainder)
 	{
 		for (int i = 0; i < remainder; ++i)
-		{
 			((char*)mask)[i] = 0xff;
-		}
+		mask[0] = swap_uint32(mask[0]);
+		mask[1] = swap_uint32(mask[1]);
+		mask[2] = swap_uint32(mask[2]);
+		mask[3] = swap_uint32(mask[3]);
+
 		__m128i loadmask = _mm_loadu_epi64(mask);
 		__m128 keypart = _mm_maskload_ps((const float*)key, loadmask);
 		hash = _mm_aesdec_si128(*(__m128i*) & keypart, hash);
@@ -245,9 +265,9 @@ ht_alloc_memory(uint64_t size_bytes)
 	return calloc(1, size_bytes);
 }
 
-void  
+void
 ht_new_ex(HtTable* table, uint32_t flags, uint32_t entry_size, float occupancy, float growth_factor,
-	uint64_t(*hashfunc)(void*, uint32_t), 
+	uint64_t(*hashfunc)(void*, uint32_t),
 	int(*keyequal)(const char*, const char*, uint32_t),
 	void* storage, uint32_t storage_size, void* (*growfunc)(uint64_t))
 {
@@ -260,8 +280,17 @@ ht_new_ex(HtTable* table, uint32_t flags, uint32_t entry_size, float occupancy, 
 	table->growth_factor = growth_factor;
 	table->growfunc = (growfunc != 0) ? growfunc : ht_alloc_memory;
 	table->keyequal = (keyequal != 0) ? keyequal : ht_key_equal;
+
+#ifdef HT_LINKED_LIST_GROW
+	uint64_t total_table_size = table->table_size;
+	table->table_size *= 0.8f; /* reserve 20 % of the space for collision spill memory */
+	table->spill_entries_size = total_table_size - table->table_size;
+	table->spill_entries_start = (HtEntry*)((char*)table->entries + (table->table_size * (entry_size + sizeof(HtEntry))));
+	table->spill_next_free_index = 0;
+#endif
+
 #ifdef _WIN32
-	// TODO(psv): Check for AES features
+	/* TODO(psv) : Check for AES features */
 	if (IsProcessorFeaturePresent(PF_AVX_INSTRUCTIONS_AVAILABLE))
 		table->hashfunc = (hashfunc != 0) ? hashfunc : ht_internal_hash;
 	else
@@ -285,7 +314,7 @@ ht_new(HtTable* table, uint32_t flags, uint32_t entry_size)
 	ht_new_ex(table, flags, entry_size, HT_DEFAULT_OCCUPANCY, HT_DEFAULT_GROWTH_FACTOR, 0, 0, initial_storage, storage_size, 0);
 }
 
-void 
+void
 ht_new_sized(HtTable* table, uint32_t flags, uint32_t entry_size, uint64_t initial_count)
 {
 	uint64_t storage_size = initial_count * (entry_size + sizeof(HtEntry));
@@ -310,13 +339,21 @@ ht_grow(HtTable* table, float factor)
 	void* value = 0;
 	for (HtIterator it = { 0 }; value = ht_next(table, &it);)
 	{
-		HtEntry* entry = (HtEntry*)((char*)value - sizeof(HtEntry));
-		ht_add(&new_table, (const char*)entry->key, entry->keysize_bytes, value);
+		HtEntry* entry = (HtEntry*)((char*)value - offsetof(HtEntry, data));
+		if (entry->keysize_bytes <= sizeof(void*))
+		{
+			void* key = entry->key;
+			ht_add(&new_table, (const char*)&key, entry->keysize_bytes, value);
+		}
+		else
+		{
+			ht_add(&new_table, (const char*)entry->key, entry->keysize_bytes, value);
+		}
 	}
 #ifdef HT_STATISTICS	
 	new_table.grow_count = table->grow_count + 1;
 #endif
-	
+
 	ht_free(table);
 	*table = new_table;
 }
@@ -327,12 +364,90 @@ ht_probe_start(HtTable* table, uint64_t hash)
 	return 1 + hash % (table->table_size - 1);
 }
 
-void* 
+#ifdef HT_LINKED_LIST_GROW
+void*
 ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 {
 	uint64_t hash = table->hashfunc((void*)key, keysize_bytes);
+	if ((table->entry_count + 1) > (uint64_t)(table->table_size * table->occupancy) || (table->spill_entry_count + 1) > table->spill_entries_size)
+	{
+		/* should grow */
+		if (table->flags & HTABLE_DISABLE_GROW)
+			return 0;
+		ht_grow(table, table->growth_factor);
+	}
+
 	uint64_t index = hash % table->table_size;
 
+	uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
+	HtEntry* entry = (HtEntry*)((char*)table->entries + index * entry_size);
+	if (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED)
+	{
+		do {
+			if (entry->hash == hash && keysize_bytes == entry->keysize_bytes)
+			{
+				/* Check if the entry is the same and overwrite it */
+				switch (keysize_bytes)
+				{
+					case 8: if ((uint64_t)entry->key == *(uint64_t*)key) return entry->data; break;
+					case 4: if ((uint32_t)entry->key == *(uint32_t*)key) return entry->data; break;
+					case 2: if ((uint16_t)entry->key == *(uint16_t*)key) return entry->data; break;
+					case 1: if ((uint8_t)entry->key == *(uint8_t*)key) return entry->data; break;
+					default: {
+						if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
+							return entry->data;
+					} break;
+				}
+			}
+
+#ifdef HT_STATISTICS
+			table->add_collision_count++;
+#endif		
+			if (entry->next_index < 0)
+				break;
+
+			entry = (HtEntry*)((char*)table->spill_entries_start + (entry->next_index * entry_size));
+		} while (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED);
+
+		HtEntry* new_entry = (HtEntry*)((char*)table->spill_entries_start + (table->spill_next_free_index * entry_size));
+		entry->next_index = table->spill_next_free_index;
+		if (new_entry->next_index == -1 || !(new_entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE))
+		{
+			/* There was no next free, so assume is the next slot */
+			table->spill_next_free_index++;
+		}
+		else
+		{
+			/* There was a next free, set it instead */
+			table->spill_next_free_index = new_entry->next_index;
+		}
+		entry = new_entry;
+
+		table->spill_entry_count++;
+	}
+
+	switch (keysize_bytes)
+	{
+		case 8: entry->key = (void*)*(uint64_t*)key; break;
+		case 4: entry->key = (void*)*(uint32_t*)key; break;
+		case 2: entry->key = (void*)*(uint16_t*)key; break;
+		case 1: entry->key = (void*)*(uint8_t*)key; break;
+		default: entry->key = (void*)key; break;
+	}
+	entry->keysize_bytes = keysize_bytes;
+	entry->flags |= HTABLE_ENTRY_FLAG_OCCUPIED;
+	entry->hash = hash;
+	entry->next_index = -1;
+
+	table->entry_count++;
+
+	return entry->data;
+}
+#else
+void*
+ht_alloc(HtTable* table, const char* key, int keysize_bytes)
+{
+	uint64_t hash = table->hashfunc((void*)key, keysize_bytes);
 	if ((table->entry_count + 1) > (uint64_t)(table->table_size * table->occupancy))
 	{
 		/* should grow */
@@ -340,6 +455,8 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 			return 0;
 		ht_grow(table, table->growth_factor);
 	}
+
+	uint64_t index = hash % table->table_size;
 
 	uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
 	HtEntry* entry = (HtEntry*)((char*)table->entries + index * entry_size);
@@ -350,7 +467,7 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 		do {
 			if (entry->hash == hash && keysize_bytes == entry->keysize_bytes)
 			{
-				// Check if the entry is the same and overwrite it
+				/* Check if the entry is the same and overwrite it */
 				switch (keysize_bytes)
 				{
 					case 8: if ((uint64_t)entry->key == *(uint64_t*)key) return entry->data; break;
@@ -378,9 +495,9 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 		case 8: entry->key = (void*)*(uint64_t*)key; break;
 		case 4: entry->key = (void*)*(uint32_t*)key; break;
 		case 2: entry->key = (void*)*(uint16_t*)key; break;
-		case 1: entry->key = (void*)*(uint8_t* )key; break;
+		case 1: entry->key = (void*)*(uint8_t*)key; break;
 		default: entry->key = (void*)key; break;
-	}	
+	}
 	entry->keysize_bytes = keysize_bytes;
 	entry->flags |= HTABLE_ENTRY_FLAG_OCCUPIED;
 	entry->hash = hash;
@@ -389,8 +506,9 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 
 	return entry->data;
 }
+#endif
 
-void* 
+void*
 ht_add(HtTable* table, const char* key, int keysize_bytes, void* value)
 {
 	void* entry = ht_alloc(table, key, keysize_bytes);
@@ -398,7 +516,44 @@ ht_add(HtTable* table, const char* key, int keysize_bytes, void* value)
 	return entry;
 }
 
-void* 
+#ifdef HT_LINKED_LIST_GROW
+void*
+ht_get(HtTable* table, const char* key, int keysize_bytes)
+{
+	uint64_t hash = table->hashfunc((void*)key, keysize_bytes);
+	uint64_t index = hash % table->table_size;
+
+	uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
+	HtEntry* entry = (HtEntry*)((char*)table->entries + index * entry_size);
+
+	while (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED)
+	{
+		if (entry->hash == hash && keysize_bytes == entry->keysize_bytes)
+		{
+			switch (keysize_bytes)
+			{
+				case 8: if ((uint64_t)entry->key == *(uint64_t*)key) return entry->data; break;
+				case 4: if ((uint32_t)entry->key == *(uint32_t*)key) return entry->data; break;
+				case 2: if ((uint16_t)entry->key == *(uint16_t*)key) return entry->data; break;
+				case 1: if ((uint8_t)entry->key == *(uint8_t*)key) return entry->data; break;
+				default: {
+					if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
+						return entry->data;
+				} break;
+			}
+		}
+#ifdef HT_STATISTICS
+		table->lookup_collision_count++;
+#endif
+		if (entry->next_index < 0)
+			break;
+		entry = (HtEntry*)((char*)table->spill_entries_start + (entry->next_index * entry_size));
+	}
+
+	return 0;
+}
+#else
+void*
 ht_get(HtTable* table, const char* key, int keysize_bytes)
 {
 	uint64_t hash = table->hashfunc((void*)key, keysize_bytes);
@@ -417,7 +572,7 @@ ht_get(HtTable* table, const char* key, int keysize_bytes)
 				case 8: if ((uint64_t)entry->key == *(uint64_t*)key) return entry->data; break;
 				case 4: if ((uint32_t)entry->key == *(uint32_t*)key) return entry->data; break;
 				case 2: if ((uint16_t)entry->key == *(uint16_t*)key) return entry->data; break;
-				case 1: if ((uint8_t )entry->key == *(uint8_t*) key) return entry->data; break;
+				case 1: if ((uint8_t)entry->key == *(uint8_t*)key) return entry->data; break;
 				default: {
 					if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
 						return entry->data;
@@ -435,18 +590,59 @@ ht_get(HtTable* table, const char* key, int keysize_bytes)
 
 	return 0;
 }
+#endif
 
+#ifdef HT_LINKED_LIST_GROW
 void
 ht_delete(HtTable* table, const char* key, int keysize_bytes)
 {
 	void* value = ht_get(table, key, keysize_bytes);
 	if (value)
 	{
-		HtEntry* entry = (HtEntry*)((char*)value - sizeof(HtEntry));
+		HtEntry* entry = (HtEntry*)((char*)value - offsetof(HtEntry, data));
+		uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
+		if (entry->next_index >= 0)
+		{
+			HtEntry* next = (HtEntry*)((char*)table->spill_entries_start + entry->next_index * entry_size);
+
+			/* Update the next free */
+			uint32_t current_next = entry->next_index;
+			memcpy(entry, next, entry_size);
+
+			next->next_index = table->spill_next_free_index;
+			table->spill_next_free_index = current_next;
+
+			next->flags = 0;
+			next->keysize_bytes = 0;
+			table->spill_entry_count--;
+		}
+		else
+		{
+			entry->flags = HTABLE_ENTRY_FLAG_TOMBSTONE;
+			entry->keysize_bytes = 0;
+			/* If removed something from the spill, update the next free */
+			if (value > table->spill_entries_start)
+			{
+				entry->next_index = table->spill_next_free_index;
+				char* at = (char*)value - offsetof(HtEntry, data);
+				table->spill_next_free_index = (uint32_t)((at - (char*)table->spill_entries_start) / entry_size);
+			}
+		}
+	}
+}
+#else
+void
+ht_delete(HtTable* table, const char* key, int keysize_bytes)
+{
+	void* value = ht_get(table, key, keysize_bytes);
+	if (value)
+	{
+		HtEntry* entry = (HtEntry*)((char*)value - offsetof(HtEntry, data));
 		entry->flags |= HTABLE_ENTRY_FLAG_TOMBSTONE;
 		entry->keysize_bytes = 0;
 	}
 }
+#endif
 
 void
 ht_free(HtTable* table)
@@ -456,25 +652,66 @@ ht_free(HtTable* table)
 	table->entries = 0;
 }
 
-void* 
+void*
 ht_add_c(HtTable* table, const char* key, void* value)
 {
 	return ht_add(table, key, strlen(key), value);
 }
 
-void* 
+void*
 ht_get_c(HtTable* table, const char* key)
 {
 	return ht_get(table, key, strlen(key));
 }
 
-void 
+void
 ht_delete_c(HtTable* table, const char* key)
 {
 	ht_delete(table, key, strlen(key));
 }
 
-void* 
+#ifdef HT_LINKED_LIST_GROW
+void*
+ht_next(HtTable* table, HtIterator* it)
+{
+	uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
+	HtEntry* entry = 0;
+
+	if (it->at < table->table_size)
+	{
+		do {
+			entry = (HtEntry*)((char*)table->entries + it->at * entry_size);
+			it->at = (it->at + 1);			
+			if (it->at >= table->table_size)
+				break;
+		} while (!(entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED) || (entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE));
+		if (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED && !(entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE))
+		{
+			it->i++;
+			return entry->data;
+		}
+	}
+
+	if (table->spill_entry_count == 0)
+		return 0;
+
+	if (it->at >= table->table_size)
+	{
+		uint64_t spill_index = it->at - table->table_size - 1;
+		do {
+			entry = (HtEntry*)((char*)table->spill_entries_start + spill_index * entry_size);
+			it->at = (it->at + 1);			
+			spill_index++;
+			if (spill_index >= table->spill_entries_size)
+				return 0;
+		} while (!(entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED) || (entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE));
+	}
+
+	it->i++;
+	return entry->data;
+}
+#else
+void*
 ht_next(HtTable* table, HtIterator* it)
 {
 	uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
@@ -486,9 +723,9 @@ ht_next(HtTable* table, HtIterator* it)
 		if (it->at > table->table_size)
 			return 0;
 	} while (!(entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED) || (entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE));
-	
+
 	return entry->data;
 }
-
 #endif
+#endif // HT_IMPLEMENTATION
 #endif // HTHASH_
