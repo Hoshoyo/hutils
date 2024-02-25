@@ -112,6 +112,8 @@ typedef struct {
 typedef struct {
 	uint64_t i;
 	uint64_t at;
+	void*    key;
+	uint32_t keysize_bytes;
 } HtIterator;
 
 typedef struct {
@@ -808,6 +810,8 @@ ht_next(HtTable* table, HtIterator* it)
 		if (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED && entry->flags)
 		{
 			it->i++;
+			it->key = entry->key;
+			it->keysize_bytes = entry->keysize_bytes;
 			return entry->data;
 		}
 	}
@@ -828,6 +832,8 @@ ht_next(HtTable* table, HtIterator* it)
 	}
 
 	it->i++;
+	it->key = entry->key;
+	it->keysize_bytes = entry->keysize_bytes;
 	return entry->data;
 }
 #else
