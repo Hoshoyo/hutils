@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include <wmmintrin.h>
 #include <immintrin.h>
 
@@ -103,16 +104,14 @@ __declspec(dllimport) int __stdcall IsProcessorFeaturePresent(uint32_t feature);
 #define HT_DEFAULT_GROWTH_FACTOR 1.0f	/* 100% */
 
 typedef struct {
-	size_t capacity;    // the current committed memory capacity of the arena
-	void*  base;        // pointer to the base memory of the arena
+	size_t capacity;    /* the current committed memory capacity of the arena */
+	void*  base;        /* pointer to the base memory of the arena */
 	void*  at;
 } HtArena;
 
 typedef struct {
 	uint64_t i;
 	uint64_t at;
-	void*    key;
-	uint32_t keysize_bytes;
 } HtIterator;
 
 typedef struct {
@@ -298,7 +297,7 @@ ht_new_ex(HtTable* table, uint32_t flags, uint32_t entry_size, float occupancy, 
 	if (!(flags & HTABLE_DONT_COPY_KEYS))
 	{
 		table->key_arena.capacity = table->table_size * 32;
-		table->key_arena.base = calloc(1, table->key_arena.capacity); // assume 32 bytes as an average key size
+		table->key_arena.base = calloc(1, table->key_arena.capacity); /* assume 32 bytes as an average key size */
 		table->key_arena.at = table->key_arena.base;
 	}
 	else
@@ -313,7 +312,7 @@ ht_new_ex(HtTable* table, uint32_t flags, uint32_t entry_size, float occupancy, 
 	table->table_size *= 0.8f; /* reserve 20 % of the space for collision spill memory */
 	table->spill_entries_size = total_table_size - table->table_size;
 	table->spill_entries_start = (HtEntry*)((char*)table->entries + (table->table_size * (entry_size + sizeof(HtEntry))));
-	table->spill_next_free_index = 0;
+	table->spill_next_free_index = 1; /* 0 is reserved to indicate not used */
 #endif
 
 #ifdef _WIN32
@@ -411,6 +410,36 @@ ht_arena_copy(HtTable* table, void* key, int keysize_bytes)
 }
 
 #ifdef HT_LINKED_LIST_GROW
+
+// TODO(psv): Make this faster
+static HtEntry*
+find_next_free_entry(HtTable* table, int* find_index)
+{
+	int32_t index = table->spill_next_free_index;
+	uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
+	HtEntry* entry = (HtEntry*)((char*)table->spill_entries_start + (index * entry_size));
+
+	if (!entry->flags)
+	{
+		*find_index = index;
+		return entry;
+	}
+	else
+	{
+		for (int32_t i = 1; i < table->spill_entries_size; ++i)
+		{
+			HtEntry* entry = (HtEntry*)((char*)table->spill_entries_start + (i * entry_size));
+			if (!entry->flags)
+			{
+				*find_index = i;
+				return entry;
+			}
+		}
+	}
+	assert(0); /* Should be unreachable */
+	return 0;
+}
+
 void*
 ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 {
@@ -449,27 +478,21 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 #ifdef HT_STATISTICS
 			table->add_collision_count++;
 #endif		
-			if (entry->next_index < 0)
+			if (entry->next_index <= 0)
+			{
+				/* Could not find the entry, so we need to allocate it */
+				int32_t free_index = 0;
+				HtEntry* new_entry = find_next_free_entry(table, &free_index);
+				table->spill_entry_count++;
+				entry->next_index = free_index;
+				entry = new_entry;
 				break;
+			}
 
 			entry = (HtEntry*)((char*)table->spill_entries_start + (entry->next_index * entry_size));
 		} while (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED);
 
-		HtEntry* new_entry = (HtEntry*)((char*)table->spill_entries_start + (table->spill_next_free_index * entry_size));
-		entry->next_index = table->spill_next_free_index;
-		if (new_entry->next_index == -1 || !(new_entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE))
-		{
-			/* There was no next free, so assume is the next slot */
-			table->spill_next_free_index++;
-		}
-		else
-		{
-			/* There was a next free, set it instead */
-			table->spill_next_free_index = new_entry->next_index;
-		}
-		entry = new_entry;
-
-		table->spill_entry_count++;
+		/* this entry can now be used */
 	}
 
 	switch (keysize_bytes)
@@ -488,7 +511,7 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 	entry->keysize_bytes = keysize_bytes;
 	entry->flags = HTABLE_ENTRY_FLAG_OCCUPIED;
 	entry->hash = hash;
-	entry->next_index = -1;
+	entry->next_index = 0;
 
 	table->entry_count++;
 
@@ -511,8 +534,16 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 
 	uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
 	HtEntry* entry = (HtEntry*)((char*)table->entries + index * entry_size);
-	if (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED)
+	if (entry->flags & (HTABLE_ENTRY_FLAG_OCCUPIED|HTABLE_ENTRY_FLAG_TOMBSTONE))
 	{
+		if (entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE)
+		{
+			/* Search forward in case it is already in the table */
+			void* e = ht_get(table, key, keysize_bytes);
+			if (e)
+				return e;
+		}
+
 		/* probe forward for an empty slot */
 		uint32_t probe = ht_probe_start(table, hash);
 		do {
@@ -582,7 +613,7 @@ ht_get(HtTable* table, const char* key, int keysize_bytes)
 	uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
 	HtEntry* entry = (HtEntry*)((char*)table->entries + index * entry_size);
 
-	while (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED)
+	while (entry->flags & (HTABLE_ENTRY_FLAG_OCCUPIED|HTABLE_ENTRY_FLAG_TOMBSTONE))
 	{
 		if (entry->hash == hash && keysize_bytes == entry->keysize_bytes)
 		{
@@ -601,8 +632,8 @@ ht_get(HtTable* table, const char* key, int keysize_bytes)
 #ifdef HT_STATISTICS
 		table->lookup_collision_count++;
 #endif
-		if (entry->next_index < 0)
-			break;
+		if (entry->next_index == 0)
+			return 0;
 		entry = (HtEntry*)((char*)table->spill_entries_start + (entry->next_index * entry_size));
 	}
 
@@ -619,7 +650,7 @@ ht_get(HtTable* table, const char* key, int keysize_bytes)
 	HtEntry* entry = (HtEntry*)((char*)table->entries + index * entry_size);
 
 	uint32_t probe = ht_probe_start(table, hash);
-	while (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED)
+	while (entry->flags & (HTABLE_ENTRY_FLAG_OCCUPIED|HTABLE_ENTRY_FLAG_TOMBSTONE))
 	{
 		if (entry->hash == hash && keysize_bytes == entry->keysize_bytes)
 		{
@@ -657,36 +688,55 @@ ht_delete(HtTable* table, const char* key, int keysize_bytes)
 	{
 		HtEntry* entry = (HtEntry*)((char*)value - offsetof(HtEntry, data));
 		uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
-		if (entry->next_index >= 0)
+		
+		if (value >= table->spill_entries_start)
 		{
-			HtEntry* next = (HtEntry*)((char*)table->spill_entries_start + entry->next_index * entry_size);
+			uint64_t spill_index = ((char*)entry - (char*)table->spill_entries_start) / entry_size;
+			HtEntry* next_entry = (HtEntry*)((char*)table->spill_entries_start + (entry->next_index * entry_size));
 
-			/* Update the next free */
-			uint32_t current_next = entry->next_index;
-			memcpy(entry, next, entry_size);
-
-			next->next_index = table->spill_next_free_index;
-			table->spill_next_free_index = current_next;
-
-			next->flags = 0;
-			next->keysize_bytes = 0;
-			table->spill_entry_count--;
-			table->entry_count--;
+			/* deleting from spill */
+			if ((entry->next_index != 0) && next_entry->flags)
+			{
+				*entry = *next_entry;
+				memcpy(entry->data, next_entry->data, table->entry_size_bytes);
+			}
+			else
+			{							
+				entry->flags = 0;
+				entry->next_index = 0;
+				table->spill_next_free_index = spill_index;
+			}
 		}
 		else
 		{
-			entry->flags = HTABLE_ENTRY_FLAG_TOMBSTONE;
-			entry->keysize_bytes = 0;
-			table->entry_count--;
-			/* If removed something from the spill, update the next free */
-			if (value > table->spill_entries_start)
+			int32_t spill_index = entry->next_index;
+			/* deleting from base table */
+			if (spill_index != 0)
 			{
-				entry->next_index = table->spill_next_free_index;
-				char* at = (char*)value - offsetof(HtEntry, data);
-				table->spill_next_free_index = (uint32_t)((at - (char*)table->spill_entries_start) / entry_size);
+				/* put the spill into this slot */
+				HtEntry* spill_entry = (HtEntry*)((char*)table->spill_entries_start + (spill_index * entry_size));
+				if (spill_entry->flags)
+				{
+					*entry = *spill_entry;
+					memcpy(entry->data, spill_entry->data, table->entry_size_bytes);
+
+					/* update the next free */
+					spill_entry->flags = 0;
+					table->spill_next_free_index = spill_index;
+				}
+				else
+				{
+					entry->flags = 0;
+					entry->next_index = 0;
+				}
+			}
+			else
+			{
+				entry->flags = 0;
+				entry->next_index = 0;
 			}
 		}
-		return value;
+		table->entry_count--;		
 	}
 	return 0;
 }
@@ -698,7 +748,7 @@ ht_delete(HtTable* table, const char* key, int keysize_bytes)
 	if (value)
 	{
 		HtEntry* entry = (HtEntry*)((char*)value - offsetof(HtEntry, data));
-		entry->flags |= HTABLE_ENTRY_FLAG_TOMBSTONE;
+		entry->flags = HTABLE_ENTRY_FLAG_TOMBSTONE;
 		entry->keysize_bytes = 0;
 		table->entry_count--;
 		return value;
@@ -754,12 +804,10 @@ ht_next(HtTable* table, HtIterator* it)
 			it->at = (it->at + 1);
 			if (it->at >= table->table_size)
 				break;
-		} while (!(entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED) || (entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE));
-		if (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED && !(entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE))
+		} while (!(entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED) || (!entry->flags));
+		if (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED && entry->flags)
 		{
 			it->i++;
-			it->key = entry->key;
-			it->keysize_bytes = entry->keysize_bytes;
 			return entry->data;
 		}
 	}
@@ -769,19 +817,17 @@ ht_next(HtTable* table, HtIterator* it)
 
 	if (it->at >= table->table_size)
 	{
-		uint64_t spill_index = it->at - table->table_size - 1;
+		uint64_t spill_index = it->at - table->table_size + 1;
 		do {
 			entry = (HtEntry*)((char*)table->spill_entries_start + spill_index * entry_size);
 			it->at = (it->at + 1);
 			spill_index++;
 			if (spill_index >= table->spill_entries_size)
 				return 0;
-		} while (!(entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED) || (entry->flags & HTABLE_ENTRY_FLAG_TOMBSTONE));
+		} while (!(entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED) || (!entry->flags));
 	}
 
 	it->i++;
-	it->key = entry->key;
-	it->keysize_bytes = entry->keysize_bytes;
 	return entry->data;
 }
 #else
@@ -801,10 +847,10 @@ ht_next(HtTable* table, HtIterator* it)
 	return entry->data;
 }
 #endif
-#endif // HT_IMPLEMENTATION
+#endif /* HT_IMPLEMENTATION */
 
 #if defined(__cplusplus)
 }
-#endif // extern "C"
+#endif /* extern "C" */
 
-#endif // HTHASH_
+#endif /* HTHASH_ */
