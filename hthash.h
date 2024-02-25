@@ -738,7 +738,8 @@ ht_delete(HtTable* table, const char* key, int keysize_bytes)
 				entry->next_index = 0;
 			}
 		}
-		table->entry_count--;		
+		table->entry_count--;	
+		return value;	
 	}
 	return 0;
 }
