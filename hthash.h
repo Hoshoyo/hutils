@@ -486,7 +486,7 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 		} break;
 	}
 	entry->keysize_bytes = keysize_bytes;
-	entry->flags |= HTABLE_ENTRY_FLAG_OCCUPIED;
+	entry->flags = HTABLE_ENTRY_FLAG_OCCUPIED;
 	entry->hash = hash;
 	entry->next_index = -1;
 
@@ -555,7 +555,7 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 		}break;
 	}
 	entry->keysize_bytes = keysize_bytes;
-	entry->flags |= HTABLE_ENTRY_FLAG_OCCUPIED;
+	entry->flags = HTABLE_ENTRY_FLAG_OCCUPIED;
 	entry->hash = hash;
 
 	table->entry_count++;
@@ -671,11 +671,13 @@ ht_delete(HtTable* table, const char* key, int keysize_bytes)
 			next->flags = 0;
 			next->keysize_bytes = 0;
 			table->spill_entry_count--;
+			table->entry_count--;
 		}
 		else
 		{
 			entry->flags = HTABLE_ENTRY_FLAG_TOMBSTONE;
 			entry->keysize_bytes = 0;
+			table->entry_count--;
 			/* If removed something from the spill, update the next free */
 			if (value > table->spill_entries_start)
 			{
@@ -698,6 +700,7 @@ ht_delete(HtTable* table, const char* key, int keysize_bytes)
 		HtEntry* entry = (HtEntry*)((char*)value - offsetof(HtEntry, data));
 		entry->flags |= HTABLE_ENTRY_FLAG_TOMBSTONE;
 		entry->keysize_bytes = 0;
+		table->entry_count--;
 		return value;
 	}
 	return 0;
