@@ -5,8 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <wmmintrin.h>
-#include <immintrin.h>
+
+#ifdef __linux__
+#include <stddef.h>
+#endif
 
 /*  Define HT_IMPLEMENTATION in one of your compilation units
 	Define HT_LINKED_LIST_GROW for a linked list version
@@ -42,7 +44,7 @@
 
 		// Iterate through all values
 		int* value = 0;
-		for (HtIterator it = { 0 }; value = ht_next(&table, &it);)
+		for (HtIterator it = { 0 }; (value = ht_next(&table, &it));)
 			printf("%lld: %d\n", it.i, *value);
 
 		return 0;
@@ -78,7 +80,7 @@
 		printf("value is %d\n", *value);
 
 		// Iterate through all values
-		for (HtIterator it = { 0 }; value = ht_next(&table, &it);)
+		for (HtIterator it = { 0 }; (value = ht_next(&table, &it));)
 		{
 			printf("%lld: %d\n", it.i, *value);
 		}
@@ -88,15 +90,6 @@
 */
 #if defined(__cplusplus)
 extern "C" {
-#endif
-
-#if defined (_WIN32) || defined(_WIN64)
-#ifndef PF_AVX_INSTRUCTIONS_AVAILABLE
-#define PF_AVX_INSTRUCTIONS_AVAILABLE 39
-#endif
-#if !defined(_WINDOWS_)
-__declspec(dllimport) int __stdcall IsProcessorFeaturePresent(uint32_t feature);
-#endif
 #endif
 
 #define HT_DEFAULT_INITIAL_SIZE 64
@@ -233,39 +226,6 @@ swap_uint32(uint32_t val)
 	return (val << 16) | (val >> 16);
 }
 
-inline static uint64_t
-ht_internal_hash(void* key, uint32_t keysize_bytes)
-{
-	__m128i hash = _mm_set_epi32(0x12345678, 0x12ABCDEF, 0x12345678, 0x12345678);
-	for (int i = 0; i < keysize_bytes / sizeof(__m128i); ++i)
-	{
-		__m128i keypart = _mm_loadu_epi64(key);
-		hash = _mm_aesdec_si128(keypart, hash);
-		hash = _mm_aesdec_si128(hash, hash);
-		key = (char*)key + keysize_bytes;
-	}
-
-	uint32_t mask[4] = { 0 };
-	uint32_t remainder = keysize_bytes % sizeof(__m128i);
-
-	if (remainder)
-	{
-		for (int i = 0; i < remainder; ++i)
-			((char*)mask)[i] = 0xff;
-		mask[0] = swap_uint32(mask[0]);
-		mask[1] = swap_uint32(mask[1]);
-		mask[2] = swap_uint32(mask[2]);
-		mask[3] = swap_uint32(mask[3]);
-
-		__m128i loadmask = _mm_loadu_epi64(mask);
-		__m128 keypart = _mm_maskload_ps((const float*)key, loadmask);
-		hash = _mm_aesdec_si128(*(__m128i*) & keypart, hash);
-		hash = _mm_aesdec_si128(hash, hash);
-	}
-
-	return hash.m128i_u64[0];
-}
-
 static int
 ht_key_equal(const char* k1, const char* k2, uint32_t key_size_bytes)
 {
@@ -317,15 +277,7 @@ ht_new_ex(HtTable* table, uint32_t flags, uint32_t entry_size, float occupancy, 
 	table->spill_next_free_index = 1; /* 0 is reserved to indicate not used */
 #endif
 
-#ifdef _WIN32
-	/* TODO(psv) : Check for AES features */
-	if (IsProcessorFeaturePresent((uint32_t)PF_AVX_INSTRUCTIONS_AVAILABLE))
-		table->hashfunc = (hashfunc != 0) ? hashfunc : ht_internal_hash;
-	else
-		table->hashfunc = (hashfunc != 0) ? hashfunc : ht_internal_hash_fnv1;
-#else
 	table->hashfunc = (hashfunc != 0) ? hashfunc : ht_internal_hash_fnv1;
-#endif
 
 #ifdef HT_STATISTICS
 	table->grow_count = 0;;
@@ -365,7 +317,7 @@ ht_grow(HtTable* table, float factor)
 
 	/* copy all the values */
 	void* value = 0;
-	for (HtIterator it = { 0 }; value = ht_next(table, &it);)
+	for (HtIterator it = { 0 }; (value = ht_next(table, &it));)
 	{
 		HtEntry* entry = (HtEntry*)((char*)value - offsetof(HtEntry, data));
 		if (entry->keysize_bytes <= sizeof(void*))
@@ -464,16 +416,15 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 			if (entry->hash == hash && keysize_bytes == entry->keysize_bytes)
 			{
 				/* Check if the entry is the same and overwrite it */
-				switch (keysize_bytes)
+				if (keysize_bytes <= sizeof(void*))
 				{
-					case 8: if ((uint64_t)entry->key == *(uint64_t*)key) return entry->data; break;
-					case 4: if ((uint32_t)entry->key == *(uint32_t*)key) return entry->data; break;
-					case 2: if ((uint16_t)entry->key == *(uint16_t*)key) return entry->data; break;
-					case 1: if ((uint8_t)entry->key == *(uint8_t*)key) return entry->data; break;
-					default: {
-						if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
-							return entry->data;
-					} break;
+					if (table->keyequal(key, (const char*)&entry->key, keysize_bytes))
+						return entry->data;
+				}
+				else
+				{
+					if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
+						return entry->data;
 				}
 			}
 
@@ -497,19 +448,15 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 		/* this entry can now be used */
 	}
 
-	switch (keysize_bytes)
+	if (keysize_bytes <= sizeof(void*))
 	{
-		case 8: entry->key = (void*)*(uint64_t*)key; break;
-		case 4: entry->key = (void*)*(uint32_t*)key; break;
-		case 2: entry->key = (void*)*(uint16_t*)key; break;
-		case 1: entry->key = (void*)*(uint8_t*)key; break;
-		default: {
-			if (table->flags & HTABLE_DONT_COPY_KEYS)
-				entry->key = (void*)key;
-			else
-				entry->key = ht_arena_copy(table, (void*)key, keysize_bytes);
-		} break;
+		entry->key = *(void**)key;
 	}
+	else
+	{
+		entry->key = ht_arena_copy(table, (void*)key, keysize_bytes);
+	}
+
 	entry->keysize_bytes = keysize_bytes;
 	entry->flags = HTABLE_ENTRY_FLAG_OCCUPIED;
 	entry->hash = hash;
@@ -552,16 +499,15 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 			if (entry->hash == hash && keysize_bytes == entry->keysize_bytes)
 			{
 				/* Check if the entry is the same and overwrite it */
-				switch (keysize_bytes)
+				if (keysize_bytes <= sizeof(void*))
 				{
-					case 8: if ((uint64_t)entry->key == *(uint64_t*)key) return entry->data; break;
-					case 4: if ((uint32_t)entry->key == *(uint32_t*)key) return entry->data; break;
-					case 2: if ((uint16_t)entry->key == *(uint16_t*)key) return entry->data; break;
-					case 1: if ((uint8_t)entry->key == *(uint8_t*)key) return entry->data; break;
-					default: {
-						if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
-							return entry->data;
-					} break;
+					if (table->keyequal(key, (const char*)&entry->key, keysize_bytes))
+						return entry->data;
+				}
+				else
+				{
+					if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
+						return entry->data;
 				}
 			}
 
@@ -574,19 +520,15 @@ ht_alloc(HtTable* table, const char* key, int keysize_bytes)
 		} while (entry->flags & HTABLE_ENTRY_FLAG_OCCUPIED);
 	}
 
-	switch (keysize_bytes)
+	if (keysize_bytes <= sizeof(void*))
 	{
-		case 8: entry->key = (void*)*(uint64_t*)key; break;
-		case 4: entry->key = (void*)*(uint32_t*)key; break;
-		case 2: entry->key = (void*)*(uint16_t*)key; break;
-		case 1: entry->key = (void*)*(uint8_t*)key; break;
-		default: {
-			if (table->flags & HTABLE_DONT_COPY_KEYS)
-				entry->key = (void*)key;
-			else
-				entry->key = ht_arena_copy(table, (void*)key, keysize_bytes);
-		}break;
+		entry->key = *(void**)key;
 	}
+	else
+	{
+		entry->key = ht_arena_copy(table, (void*)key, keysize_bytes);
+	}
+
 	entry->keysize_bytes = keysize_bytes;
 	entry->flags = HTABLE_ENTRY_FLAG_OCCUPIED;
 	entry->hash = hash;
@@ -615,20 +557,19 @@ ht_get(HtTable* table, const char* key, int keysize_bytes)
 	uint32_t entry_size = ((sizeof(HtEntry) + table->entry_size_bytes));
 	HtEntry* entry = (HtEntry*)((char*)table->entries + index * entry_size);
 
-	while (entry->flags & (HTABLE_ENTRY_FLAG_OCCUPIED|HTABLE_ENTRY_FLAG_TOMBSTONE))
+	while (entry->flags & (HTABLE_ENTRY_FLAG_OCCUPIED | HTABLE_ENTRY_FLAG_TOMBSTONE))
 	{
 		if (entry->hash == hash && keysize_bytes == entry->keysize_bytes)
 		{
-			switch (keysize_bytes)
+			if (keysize_bytes <= sizeof(void*))
 			{
-				case 8: if ((uint64_t)entry->key == *(uint64_t*)key) return entry->data; break;
-				case 4: if ((uint32_t)entry->key == *(uint32_t*)key) return entry->data; break;
-				case 2: if ((uint16_t)entry->key == *(uint16_t*)key) return entry->data; break;
-				case 1: if ((uint8_t)entry->key == *(uint8_t*)key) return entry->data; break;
-				default: {
-					if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
-						return entry->data;
-				} break;
+				if (table->keyequal(key, (const char*)&entry->key, keysize_bytes))
+					return entry->data;
+			}
+			else
+			{
+				if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
+					return entry->data;
 			}
 		}
 #ifdef HT_STATISTICS
@@ -652,20 +593,19 @@ ht_get(HtTable* table, const char* key, int keysize_bytes)
 	HtEntry* entry = (HtEntry*)((char*)table->entries + index * entry_size);
 
 	uint32_t probe = ht_probe_start(table, hash);
-	while (entry->flags & (HTABLE_ENTRY_FLAG_OCCUPIED|HTABLE_ENTRY_FLAG_TOMBSTONE))
+	while (entry->flags & (HTABLE_ENTRY_FLAG_OCCUPIED | HTABLE_ENTRY_FLAG_TOMBSTONE))
 	{
 		if (entry->hash == hash && keysize_bytes == entry->keysize_bytes)
 		{
-			switch (keysize_bytes)
+			if (keysize_bytes <= sizeof(void*))
 			{
-				case 8: if ((uint64_t)entry->key == *(uint64_t*)key) return entry->data; break;
-				case 4: if ((uint32_t)entry->key == *(uint32_t*)key) return entry->data; break;
-				case 2: if ((uint16_t)entry->key == *(uint16_t*)key) return entry->data; break;
-				case 1: if ((uint8_t)entry->key == *(uint8_t*)key) return entry->data; break;
-				default: {
-					if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
-						return entry->data;
-				} break;
+				if (table->keyequal(key, (const char*)&entry->key, keysize_bytes))
+					return entry->data;
+			}
+			else
+			{
+				if (table->keyequal(key, (const char*)entry->key, keysize_bytes))
+					return entry->data;
 			}
 		}
 
